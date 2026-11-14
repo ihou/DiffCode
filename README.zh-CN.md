@@ -5,8 +5,8 @@
 <h1 align="center">DiffCode</h1>
 
 <p align="center">
-  <b>看清每一处改动，只提交你想提交的。</b><br>
-  一个轻量的原生 macOS Git diff 工具，看你自己的改动，也看 coding agent 的。
+  <b>像 IDE 一样好用的 Git diff，不用打开 IDE。</b><br>
+  一个轻量的原生 Mac 应用：看清改了什么——你自己的、同事的，或者 coding agent 的——只提交你想提交的。
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 
 ![DiffCode 的并排 diff：一个 Kotlin 文件，其中一行不参与这次提交](docs/images/chinese.png)
 
-为了看一眼改动就启动整个 IDE，要等它加载，还要占掉几个 GB 内存。DiffCode 只做这一件事，并把它做好：清楚的并排 diff、全键盘操作、精确到行的提交。原生应用，平时只占 **30–50 MB 内存**。
+AI 写的代码越来越多，同事也在不停地推提交，每天花在看 diff 上的时间越来越长。IDE 当然能把改动看得很清楚，可它同时带着代码补全、编译、索引和一堆插件：打开要等，还要占掉几个 GB 内存，就为了看一眼改了什么。DiffCode 只留下看改动需要的核心功能：清楚的并排 diff、Git 树和历史、精确到行的提交，再加一个给 agent 用的终端。原生应用，平时只占 **30–50 MB 内存**。
 
 - **平时只读。** 刷新、diff、搜索都不写仓库，也不占 `index.lock`，可以和 IDE、命令行、agent 同时开着。
 - **大文件也快。** 3 万行、800 多处变更的 diff 约 40 ms 打开，滚动一帧的开销远低于刷新间隔。

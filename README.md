@@ -5,8 +5,8 @@
 <h1 align="center">DiffCode</h1>
 
 <p align="center">
-  <b>Review every change. Commit exactly what you mean.</b><br>
-  A lightweight, native Git diff viewer for macOS, for your own work and your coding agent's.
+  <b>An IDE-grade Git diff, without the IDE.</b><br>
+  A lightweight native Mac app for reviewing what changed — yours, your teammates' or your coding agent's — and committing exactly what you mean.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
 
 ![DiffCode showing a side-by-side diff of a Kotlin file, with one line left out of the commit](docs/images/hero.png)
 
-Opening a whole IDE just to look at a diff costs gigabytes of memory and a long wait. DiffCode does that one job well: a clear side-by-side diff, a keyboard-driven workflow and precise commits, in a native app that typically uses **30–50 MB of memory**.
+Coding agents write more of the code now, and teammates keep pushing theirs, so more of the day goes to reading diffs. An IDE shows them well, but it brings code completion, builds, indexing and plugins along with it: a long wait and gigabytes of memory, just to see what changed. DiffCode keeps only what that job needs — a clear side-by-side diff, the Git history, precise commits and a terminal for your agent — in a native app that typically uses **30–50 MB of memory**.
 
 - **Read-only until you act.** Refreshing, diffing and searching never write to your repository or take `index.lock`, so DiffCode can stay open next to your IDE, your terminal and your agents.
 - **Fast on big files.** A 30,000-line diff with 800 changes opens in about 40 ms and scrolls at a fraction of a frame.
