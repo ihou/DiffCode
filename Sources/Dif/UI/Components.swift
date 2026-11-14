@@ -1,0 +1,814 @@
+import AppKit
+import SwiftUI
+
+// MARK: - AppKit bridges
+
+struct VisualEffect: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .sidebar
+    var blending: NSVisualEffectView.BlendingMode = .behindWindow
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.state = .followsWindowActiveState
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
+        view.blendingMode = blending
+    }
+}
+
+/// Lets a custom header act like a title bar: drag to move, double-click to zoom.
+struct WindowDragArea: NSViewRepresentable {
+    final class DragView: NSView {
+        override func mouseDown(with event: NSEvent) {
+            if event.clickCount == 2 {
+                window?.performZoom(nil)
+            } else {
+                window?.performDrag(with: event)
+            }
+        }
+    }
+
+    func makeNSView(context: Context) -> DragView { DragView() }
+    func updateNSView(_ view: DragView, context: Context) {}
+}
+
+/// A single-line text field that reports arrow keys, Return and Escape, so a result list
+/// can be driven from the keyboard while the field keeps focus.
+struct SearchField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String
+    var font: NSFont = .systemFont(ofSize: 15)
+    var focusToken: Int
+    var onMove: (Int) -> Void = { _ in }
+    var onSubmit: () -> Void = {}
+    var onCancel: () -> Void = {}
+    var onTab: ((Bool) -> Void)?
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: SearchField
+        var lastToken = Int.min
+
+        init(_ parent: SearchField) { self.parent = parent }
+
+        func controlTextDidChange(_ notification: Notification) {
+            guard let field = notification.object as? NSTextField else { return }
+            if parent.text != field.stringValue { parent.text = field.stringValue }
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+            switch selector {
+            case #selector(NSResponder.moveUp(_:)): parent.onMove(-1)
+            case #selector(NSResponder.moveDown(_:)): parent.onMove(1)
+            case #selector(NSResponder.scrollPageUp(_:)), #selector(NSResponder.pageUp(_:)): parent.onMove(-10)
+            case #selector(NSResponder.scrollPageDown(_:)), #selector(NSResponder.pageDown(_:)): parent.onMove(10)
+            case #selector(NSResponder.insertNewline(_:)): parent.onSubmit()
+            case #selector(NSResponder.cancelOperation(_:)): parent.onCancel()
+            case #selector(NSResponder.insertTab(_:)):
+                guard let onTab = parent.onTab else { return false }
+                onTab(false)
+            case #selector(NSResponder.insertBacktab(_:)):
+                guard let onTab = parent.onTab else { return false }
+                onTab(true)
+            default: return false
+            }
+            return true
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField()
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = font
+        field.placeholderString = placeholder
+        field.delegate = context.coordinator
+        field.cell?.usesSingleLineMode = true
+        field.cell?.wraps = false
+        field.cell?.isScrollable = true
+        field.lineBreakMode = .byTruncatingTail
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return field
+    }
+
+    func updateNSView(_ field: NSTextField, context: Context) {
+        context.coordinator.parent = self
+        if field.stringValue != text { field.stringValue = text }
+        if field.font != font { field.font = font }
+        if context.coordinator.lastToken != focusToken {
+            context.coordinator.lastToken = focusToken
+            DispatchQueue.main.async {
+                guard let window = field.window else { return }
+                window.makeFirstResponder(field)
+                field.currentEditor()?.selectAll(nil)
+            }
+        }
+    }
+}
+
+/// Holds the AppKit view that owns keyboard focus for a custom list.
+@MainActor
+final class ListFocus {
+    weak var view: NSView?
+    func take() {
+        guard let view, let window = view.window else { return }
+        if window.firstResponder !== view { window.makeFirstResponder(view) }
+    }
+}
+
+/// An invisible first responder that turns key presses into a closure call.
+/// AppKit focus is used instead of SwiftUI's so the lists and the canvas share one focus model.
+struct KeyCatcher: NSViewRepresentable {
+    var focus: ListFocus
+    var focusToken: Int
+    /// Tells the lists apart when asking which of them has the keyboard.
+    var name = KeyboardListName.list
+    var onKey: (NSEvent) -> Bool
+    var onFocusChange: (Bool) -> Void
+    /// ⌘A, for lists that can select several rows. Nil leaves Select All disabled.
+    var onSelectAll: (() -> Void)?
+
+    /// The newest focus request. A list that is only now being created (its tab was just shown)
+    /// has no earlier token to compare with, so it checks here whether the request was meant for it.
+    static var pending: (token: Int, time: CFTimeInterval) = (Int.min, 0)
+
+    final class CatcherView: NSView {
+        var onKey: ((NSEvent) -> Bool)?
+        var onFocusChange: ((Bool) -> Void)?
+        var onSelectAll: (() -> Void)? { didSet { handlesSelectAll = onSelectAll != nil } }
+        /// For `responds(to:)`, which is not tied to the main thread.
+        nonisolated(unsafe) private var handlesSelectAll = false
+        var lastToken = Int.min
+
+        override var acceptsFirstResponder: Bool { true }
+        override func selectAll(_ sender: Any?) { onSelectAll?() }
+        override func responds(to selector: Selector!) -> Bool {
+            if selector == #selector(selectAll(_:)) { return handlesSelectAll }
+            return super.responds(to: selector)
+        }
+        override func keyDown(with event: NSEvent) {
+            if onKey?(event) != true { super.keyDown(with: event) }
+        }
+        override func becomeFirstResponder() -> Bool { onFocusChange?(true); return true }
+        override func resignFirstResponder() -> Bool { onFocusChange?(false); return true }
+    }
+
+    func makeNSView(context: Context) -> CatcherView {
+        let view = CatcherView()
+        view.identifier = NSUserInterfaceItemIdentifier(name)
+        focus.view = view
+        return view
+    }
+
+    func updateNSView(_ view: CatcherView, context: Context) {
+        focus.view = view
+        view.onKey = onKey
+        view.onFocusChange = onFocusChange
+        view.onSelectAll = onSelectAll
+        if view.lastToken != focusToken {
+            let first = view.lastToken == Int.min
+            view.lastToken = focusToken
+            let requested = Self.pending.token == focusToken && CACurrentMediaTime() - Self.pending.time < 1
+            if !first || requested {
+                DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
+            }
+        }
+    }
+}
+
+// MARK: - Keyboard-driven list
+
+enum KeyboardListName {
+    static let list = "list"
+    static let tree = "tree"
+}
+
+/// Which rows a click or an arrow key leaves selected in a list that allows several.
+enum ListSelection {
+    /// The rows from `anchor` to `target`, whichever comes first. Just `target` when the anchor is gone.
+    static func range(in ids: [String], from anchor: String?, to target: String) -> Set<String> {
+        guard let end = ids.firstIndex(of: target) else { return [] }
+        guard let anchor, let start = ids.firstIndex(of: anchor) else { return [target] }
+        return Set(ids[min(start, end)...max(start, end)])
+    }
+
+    /// ⌘-click: adds the row, or takes it out again. Returns the selection and the row that becomes the main one.
+    static func toggle(_ id: String, in selected: Set<String>, ids: [String]) -> (selected: Set<String>, primary: String?) {
+        var selected = selected
+        if selected.contains(id) {
+            selected.remove(id)
+            return (selected, ids.last { selected.contains($0) })
+        }
+        selected.insert(id)
+        return (selected, id)
+    }
+}
+
+/// A lazily rendered, selectable list with arrow-key navigation.
+struct KeyboardList<Row: Identifiable, Content: View>: View where Row.ID == String {
+    let rows: [Row]
+    @Binding var selection: String?
+    /// Every selected row, for lists that act on several at once (⌘-click, ⇧-click, ⇧↑↓, ⌘A).
+    /// `selection` stays the main row: the one shown elsewhere and moved by the arrow keys.
+    var multiSelection: Binding<Set<String>>?
+    var focusToken: Int
+    var name = KeyboardListName.list
+    var rowHeight: CGFloat = 24
+    /// Extra keys (←/→/↩/Esc …). Return true when handled.
+    var onKey: (NSEvent, Row?) -> Bool = { _, _ in false }
+    /// A single click, after the row has been selected.
+    var onClick: (Row) -> Void = { _ in }
+    var onDoubleClick: (Row) -> Void = { _ in }
+    var onLastRowAppear: (() -> Void)?
+    /// Bump to centre the selected row, however far away it is.
+    var revealToken = 0
+    /// Reports how far the list is scrolled, in points.
+    var onScroll: ((CGFloat) -> Void)?
+    /// Rows that can be clicked but never selected (section headers); the arrow keys step over them.
+    var canSelect: ((Row) -> Bool)?
+    /// A row's right-click menu, built on the click. One AppKit view over the whole list hands it out: a SwiftUI
+    /// `.contextMenu` keeps some 20 KB alive for every row ever shown, which adds up in a long list.
+    var menu: ((Row) -> NSMenu?)?
+    /// Files a row stands for, to drag out of the window (into Finder, a mail, a chat, another app's terminal).
+    /// The same AppKit view starts the drag, so the rows carry no drag gesture of their own.
+    var dragURLs: ((Row) -> [URL])?
+    @ViewBuilder var content: (Row, _ selected: Bool, _ focused: Bool) -> Content
+
+    @State private var isFocused = false
+    @State private var focus = ListFocus()
+    /// Where a ⇧-extended selection started.
+    @State private var anchor: String?
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(rows) { row in
+                        let selected = row.id == selection || (multiSelection?.wrappedValue.contains(row.id) ?? false)
+                        content(row, selected, isFocused)
+                            .frame(height: UI.s(rowHeight))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(selected ? (isFocused ? Color.difSelection : Color.difHover) : Color.clear)
+                                    .padding(.horizontal, 6)
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                let flags = NSApp.currentEvent?.modifierFlags ?? []
+                                focus.take()
+                                if let canSelect, !canSelect(row) {
+                                    onClick(row)
+                                    return
+                                }
+                                if let multi = multiSelection, flags.contains(.command) {
+                                    var current = multi.wrappedValue
+                                    if let selection { current.insert(selection) }
+                                    let result = ListSelection.toggle(row.id, in: current, ids: rows.map(\.id))
+                                    multi.wrappedValue = result.selected
+                                    anchor = row.id
+                                    selection = result.primary
+                                    return
+                                }
+                                if let multi = multiSelection, flags.contains(.shift) {
+                                    multi.wrappedValue = ListSelection.range(in: rows.map(\.id), from: anchor ?? selection, to: row.id)
+                                    selection = row.id
+                                    return
+                                }
+                                pick(row.id)
+                                if (NSApp.currentEvent?.clickCount ?? 1) >= 2 { onDoubleClick(row) } else { onClick(row) }
+                            }
+                            .id(row.id)
+                            .onAppear {
+                                if row.id == rows.last?.id { onLastRowAppear?() }
+                            }
+                    }
+                }
+                .overlay {
+                    if menu != nil || dragURLs != nil {
+                        RowMenuCatcher(rowHeight: UI.s(rowHeight),
+                                       menu: menu.map { menu in { index in rows.indices.contains(index) ? menu(rows[index]) : nil } },
+                                       drag: dragURLs.map { urls in { index in rows.indices.contains(index) ? urls(rows[index]) : [] } })
+                    }
+                }
+                .padding(.vertical, 4)
+                .background(alignment: .topLeading) {
+                    if let onScroll { ScrollProbe(onScroll: onScroll).frame(width: 1, height: 1) }
+                }
+            }
+            .background(KeyCatcher(focus: focus, focusToken: focusToken, name: name, onKey: { handle($0, proxy) },
+                                   onFocusChange: { isFocused = $0 },
+                                   onSelectAll: multiSelection.map { multi in { multi.wrappedValue = Set(rows.map(\.id)) } }))
+            .onChange(of: selection) { _, id in
+                if let id { proxy.scrollTo(id) }
+                // The main row was moved from outside (another file opened, a refresh): the rest of the selection goes.
+                if let multi = multiSelection, !(id.map(multi.wrappedValue.contains) ?? multi.wrappedValue.isEmpty) {
+                    multi.wrappedValue = id.map { [$0] } ?? []
+                    anchor = id
+                }
+            }
+            .onChange(of: revealToken) { _, _ in
+                // After this update's layout, so rows that were just revealed can be scrolled to.
+                DispatchQueue.main.async {
+                    if let id = selection { withAnimation(.snappy(duration: 0.22)) { proxy.scrollTo(id, anchor: .center) } }
+                }
+            }
+        }
+    }
+
+    /// A plain click or arrow key: this row and nothing else.
+    private func pick(_ id: String) {
+        multiSelection?.wrappedValue = [id]
+        anchor = id
+        selection = id
+    }
+
+    private func handle(_ event: NSEvent, _ proxy: ScrollViewProxy) -> Bool {
+        let index = rows.firstIndex { $0.id == selection }
+        func select(_ target: Int) {
+            guard !rows.isEmpty else { return }
+            var position = min(rows.count - 1, max(0, target))
+            if let canSelect {
+                // Step past rows that cannot be selected, in the direction of travel; stay put at either end.
+                var step = position >= (index ?? -1) ? 1 : -1
+                // Home and End look for the first and last selectable row.
+                if target <= 0 { step = 1 } else if target >= rows.count - 1 { step = -1 }
+                while rows.indices.contains(position), !canSelect(rows[position]) { position += step }
+                guard rows.indices.contains(position) else { return }
+            }
+            let id = rows[position].id
+            if let multi = multiSelection, event.modifierFlags.contains(.shift) {
+                multi.wrappedValue = ListSelection.range(in: rows.map(\.id), from: anchor ?? selection, to: id)
+                selection = id
+            } else {
+                pick(id)
+            }
+        }
+        switch event.keyCode {
+        case 125: select((index ?? -1) + 1)
+        case 126: select((index ?? rows.count) - 1)
+        case 121: select((index ?? -1) + 12)
+        case 116: select((index ?? rows.count) - 12)
+        case 115: select(0)
+        case 119: select(rows.count - 1)
+        default: return onKey(event, index.map { rows[$0] })
+        }
+        return true
+    }
+}
+
+/// Lies over a list of rows of one height and gives them their right-click menu, and drags their files out of the
+/// window. Only a right-click (or ⌃-click) stops here; every other click, and the scroll wheel, goes through to the
+/// rows. A drag is noticed on its way to them (a local event monitor, there only while the list is on screen).
+private struct RowMenuCatcher: NSViewRepresentable {
+    var rowHeight: CGFloat
+    var menu: ((Int) -> NSMenu?)?
+    var drag: ((Int) -> [URL])?
+
+    func makeNSView(context: Context) -> CatcherView { CatcherView() }
+
+    func updateNSView(_ view: CatcherView, context: Context) {
+        view.rowHeight = rowHeight
+        view.menuForRow = menu
+        view.urlsForRow = drag
+    }
+
+    final class CatcherView: NSView, NSDraggingSource {
+        var rowHeight: CGFloat = 24
+        var menuForRow: ((Int) -> NSMenu?)?
+        var urlsForRow: ((Int) -> [URL])? {
+            didSet { if (urlsForRow == nil) != (oldValue == nil) { updateMonitor() } }
+        }
+        /// Removed when the view leaves its window; `deinit` only covers a view freed while still in one.
+        nonisolated(unsafe) private var monitor: Any?
+        /// Where a press that could become a drag started, in window coordinates, and on which row.
+        private var press: (point: NSPoint, row: Int)?
+
+        override var isFlipped: Bool { true }
+
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            guard let event = NSApp.currentEvent else { return nil }
+            let wantsMenu = event.type == .rightMouseDown || (event.type == .leftMouseDown && event.modifierFlags.contains(.control))
+            return wantsMenu ? super.hitTest(point) : nil
+        }
+
+        override func menu(for event: NSEvent) -> NSMenu? {
+            let point = convert(event.locationInWindow, from: nil)
+            guard rowHeight > 0, point.y >= 0 else { return nil }
+            return menuForRow?(Int(point.y / rowHeight))
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            updateMonitor()
+        }
+
+        private func updateMonitor() {
+            let wanted = window != nil && urlsForRow != nil
+            if wanted, monitor == nil {
+                monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { [weak self] event in
+                    self?.handle(event) ?? event
+                }
+            } else if !wanted, let monitor {
+                NSEvent.removeMonitor(monitor)
+                self.monitor = nil
+                press = nil
+            }
+        }
+
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            guard event.window === window, rowHeight > 0 else { return event }
+            switch event.type {
+            case .leftMouseDown:
+                press = nil
+                let point = convert(event.locationInWindow, from: nil)
+                // Only a press on this list's rows, not on something lying over it (a dropdown, a dialog).
+                // `hitTest` takes a point in the coordinates of the view's superview.
+                guard visibleRect.contains(point), !event.modifierFlags.contains(.control),
+                      let scroll = enclosingScrollView, let content = window?.contentView, let frame = content.superview,
+                      let hit = content.hitTest(frame.convert(event.locationInWindow, from: nil)), hit.isDescendant(of: scroll) else { return event }
+                press = (event.locationInWindow, Int(point.y / rowHeight))
+                return event
+            case .leftMouseDragged:
+                guard let start = press else { return event }
+                let location = event.locationInWindow
+                guard hypot(location.x - start.point.x, location.y - start.point.y) >= 5 else { return event }
+                press = nil
+                let urls = urlsForRow?(start.row) ?? []
+                guard !urls.isEmpty else { return event }
+                beginDrag(urls, event: event, from: convert(start.point, from: nil))
+                return nil
+            default:
+                press = nil
+                return event
+            }
+        }
+
+        private func beginDrag(_ urls: [URL], event: NSEvent, from point: NSPoint) {
+            let items = urls.enumerated().map { index, url -> NSDraggingItem in
+                let item = NSDraggingItem(pasteboardWriter: url as NSURL)
+                let icon = NSWorkspace.shared.icon(forFile: url.path)
+                let size = NSSize(width: 32, height: 32)
+                icon.size = size
+                // Fanned out a little, so several files look like several.
+                let offset = CGFloat(min(index, 4)) * 4
+                item.setDraggingFrame(NSRect(x: point.x - 16 + offset, y: point.y - 16 + offset, width: size.width, height: size.height),
+                                      contents: icon)
+                return item
+            }
+            let session = beginDraggingSession(with: items, event: event, source: self)
+            session.animatesToStartingPositionsOnCancelOrFail = true
+            session.draggingFormation = .pile
+            #if DEBUG || DIF_HOOKS
+            FileHandle.standardError.write(Data("drag: began \(urls.map(\.lastPathComponent))\n".utf8))
+            #endif
+        }
+
+        /// A copy outside the app (Finder never moves a file out of the repository); nothing inside it.
+        nonisolated func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+            context == .outsideApplication ? [.copy, .generic] : []
+        }
+
+        deinit {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+        }
+    }
+}
+
+/// Reports how far the scroll view around it is scrolled. Sits inside the scrolled content and
+/// listens to the clip view: SwiftUI's own geometry preferences do not change while a list scrolls on macOS.
+private struct ScrollProbe: NSViewRepresentable {
+    var onScroll: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> ProbeView { ProbeView() }
+    func updateNSView(_ view: ProbeView, context: Context) { view.onScroll = onScroll }
+
+    final class ProbeView: NSView {
+        var onScroll: ((CGFloat) -> Void)?
+        private weak var observed: NSClipView?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            attach()
+        }
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            attach()
+        }
+
+        private func attach() {
+            let clip = window == nil ? nil : enclosingScrollView?.contentView
+            guard clip !== observed else { return }
+            if let observed {
+                NotificationCenter.default.removeObserver(self, name: NSView.boundsDidChangeNotification, object: observed)
+            }
+            observed = clip
+            guard let clip else { return }
+            clip.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(boundsChanged),
+                                                   name: NSView.boundsDidChangeNotification, object: clip)
+            boundsChanged()
+        }
+
+        @objc private func boundsChanged() {
+            guard let observed else { return }
+            onScroll?(max(0, observed.bounds.origin.y))
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+}
+
+// MARK: - Small controls
+
+struct IconButton: View {
+    var symbol: String
+    var help: String
+    var isActive = false
+    var size: CGFloat = 13
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.ui(size: size, weight: .medium))
+                .foregroundStyle(isActive ? Color.difAccent : Color.difText2)
+                .frame(width: UI.s(26), height: UI.s(24))
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isActive ? Color.difSelection : (hovering ? Color.difHover : Color.clear))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
+    }
+}
+
+/// A keyboard shortcut rendered as key caps.
+struct KeyCaps: View {
+    var shortcut: String
+    var size: CGFloat = 11
+
+    var body: some View {
+        if !shortcut.isEmpty {
+            Text(shortcut)
+                .font(.ui(size: size, weight: .medium, design: .rounded))
+                .foregroundStyle(Color.difText2)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1.5)
+                .background(RoundedRectangle(cornerRadius: 4, style: .continuous).fill(Color.difChip))
+        }
+    }
+}
+
+struct StatBadge: View {
+    var additions: Int?
+    var deletions: Int?
+    var size: CGFloat = 11
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let additions, additions > 0 {
+                Text("+\(additions)").foregroundStyle(Color.difAdded)
+            }
+            if let deletions, deletions > 0 {
+                Text("−\(deletions)").foregroundStyle(Color.difRemoved)
+            }
+        }
+        .font(.ui(size: size, weight: .medium, design: .monospaced))
+        .lineLimit(1)
+        .fixedSize()
+    }
+}
+
+/// A file-type glyph, tinted by language family.
+struct FileIcon: View {
+    var path: String
+    var size: CGFloat = 12
+
+    private static let table: [String: (String, UInt32)] = [
+        "kt": ("k.square.fill", 0x8B6CF6), "kts": ("k.square.fill", 0x8B6CF6),
+        "java": ("j.square.fill", 0xE8833A), "swift": ("swift", 0xF05138),
+        "xml": ("chevron.left.forwardslash.chevron.right", 0xE0914A),
+        "html": ("chevron.left.forwardslash.chevron.right", 0xE0714A),
+        "json": ("curlybraces", 0xD9A520), "yaml": ("list.bullet.indent", 0xC9566B), "yml": ("list.bullet.indent", 0xC9566B),
+        "gradle": ("gearshape.fill", 0x3BA99C), "properties": ("gearshape.fill", 0x8C93A1), "toml": ("gearshape.fill", 0x8C93A1),
+        "md": ("text.alignleft", 0x4C9FE8), "txt": ("text.alignleft", 0x8C93A1),
+        "js": ("j.square.fill", 0xE2C12E), "ts": ("t.square.fill", 0x3D8FD9), "tsx": ("t.square.fill", 0x3D8FD9), "jsx": ("j.square.fill", 0xE2C12E),
+        "py": ("p.square.fill", 0x4B8BBE), "go": ("g.square.fill", 0x2AB3CF), "rs": ("r.square.fill", 0xD9773A),
+        "c": ("c.square.fill", 0x5A8FD6), "h": ("h.square.fill", 0x8D6FD1), "cpp": ("c.square.fill", 0x5A8FD6), "cc": ("c.square.fill", 0x5A8FD6),
+        "m": ("m.square.fill", 0x5A8FD6), "mm": ("m.square.fill", 0x5A8FD6), "dart": ("d.square.fill", 0x2CB7F6),
+        "sh": ("terminal.fill", 0x6FBF73), "css": ("number", 0x4C9FE8), "scss": ("number", 0xCF649A), "sql": ("cylinder.split.1x2.fill", 0xD9A520),
+        "png": ("photo.fill", 0xB46BD6), "jpg": ("photo.fill", 0xB46BD6), "jpeg": ("photo.fill", 0xB46BD6), "webp": ("photo.fill", 0xB46BD6),
+        "gif": ("photo.fill", 0xB46BD6), "svg": ("photo.fill", 0xE0914A), "pdf": ("doc.richtext.fill", 0xE5534B),
+        "lock": ("lock.fill", 0x8C93A1), "proto": ("p.square.fill", 0x3BA99C), "rb": ("r.square.fill", 0xCC342D), "php": ("p.square.fill", 0x7377AD),
+    ]
+
+    var body: some View {
+        let ext = (path as NSString).pathExtension.lowercased()
+        let entry = Self.table[ext] ?? ("doc.fill", 0x8C93A1)
+        Image(systemName: entry.0)
+            .font(.ui(size: size))
+            .foregroundStyle(Color(NSColor(hex: entry.1)))
+            .frame(width: UI.s(size + 5), height: UI.s(size + 4))
+    }
+}
+
+// MARK: - Dividers
+
+/// What a divider resizes: columns sit side by side and are dragged left and right, rows are dragged up and down.
+enum ResizeAxis {
+    case columns, rows
+
+    var cursor: NSCursor {
+        if #available(macOS 15.0, *) { return self == .columns ? .columnResize : .rowResize }
+        return self == .columns ? .resizeLeftRight : .resizeUpDown
+    }
+}
+
+extension View {
+    /// Asks SwiftUI for the system's resize pointer over this view (macOS 15 and later).
+    @ViewBuilder
+    func resizePointer(_ axis: ResizeAxis) -> some View {
+        if #available(macOS 15.0, *) {
+            pointerStyle(axis == .columns ? .columnResize : .rowResize)
+        } else {
+            self
+        }
+    }
+}
+
+/// The part of a divider that takes the mouse. It is an AppKit view on purpose: a cursor rect is the
+/// pointer mechanism that holds inside a hosting view (the terminal's and the diff's I-beam rely on it too),
+/// whereas SwiftUI puts the arrow back over a cursor pushed from `onHover`.
+private struct GripArea: NSViewRepresentable {
+    var axis: ResizeAxis
+    var onHover: (Bool) -> Void
+    var onDrag: (CGFloat?) -> Void
+
+    func makeNSView(context: Context) -> GripView { GripView() }
+
+    func updateNSView(_ view: GripView, context: Context) {
+        if view.axis != axis {
+            view.axis = axis
+            view.window?.invalidateCursorRects(for: view)
+        }
+        view.onHover = onHover
+        view.onDrag = onDrag
+    }
+
+    final class GripView: NSView {
+        var axis = ResizeAxis.columns
+        var onHover: ((Bool) -> Void)?
+        var onDrag: ((CGFloat?) -> Void)?
+        private var origin: NSPoint?
+
+        override var mouseDownCanMoveWindow: Bool { false }
+        /// A divider can be dragged straight away in a window that is not active yet.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: axis.cursor)
+        }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            trackingAreas.forEach(removeTrackingArea)
+            addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .cursorUpdate, .activeInActiveApp, .inVisibleRect],
+                                           owner: self))
+        }
+
+        override func cursorUpdate(with event: NSEvent) { axis.cursor.set() }
+        override func mouseEntered(with event: NSEvent) { onHover?(true) }
+        override func mouseExited(with event: NSEvent) { if origin == nil { onHover?(false) } }
+
+        override func mouseDown(with event: NSEvent) {
+            origin = event.locationInWindow
+            axis.cursor.set()
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let origin else { return }
+            // The pointer can outrun a divider that has reached its limit; keep its shape until the button is up.
+            axis.cursor.set()
+            let now = event.locationInWindow
+            // Measured the way layout runs: rightwards and downwards (window coordinates grow upwards).
+            onDrag?(axis == .columns ? now.x - origin.x : origin.y - now.y)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            guard origin != nil else { return }
+            origin = nil
+            onDrag?(nil)
+            onHover?(bounds.contains(convert(event.locationInWindow, from: nil)))
+            window?.invalidateCursorRects(for: self)
+        }
+    }
+}
+
+/// The line between two panels: a hairline that lights up, a wider invisible strip to grab, and the resize pointer.
+struct DividerGrip: View {
+    var axis: ResizeAxis
+    var color = Color.difBorder
+    /// The drag's translation along the axis since it began, or nil once it has ended.
+    var onDrag: (CGFloat?) -> Void
+    @State private var hovering = false
+    @State private var dragging = false
+
+    static let grabWidth: CGFloat = 9
+
+    var body: some View {
+        let lit = hovering || dragging
+        Rectangle()
+            .fill(color)
+            .frame(width: axis == .columns ? 1 : nil, height: axis == .rows ? 1 : nil)
+            .overlay(
+                Rectangle()
+                    .fill(lit ? Color.difAccent.opacity(0.6) : Color.clear)
+                    .frame(width: axis == .columns ? 3 : nil, height: axis == .rows ? 3 : nil)
+                    .allowsHitTesting(false)
+            )
+            .overlay(
+                GripArea(axis: axis, onHover: { hovering = $0 }, onDrag: { translation in
+                    dragging = translation != nil
+                    onDrag(translation)
+                })
+                .frame(width: axis == .columns ? Self.grabWidth : nil, height: axis == .rows ? Self.grabWidth : nil)
+                .resizePointer(axis)
+            )
+            .zIndex(1)
+    }
+}
+
+/// A draggable divider that sets the width of the panel on its left.
+struct ResizeHandle: View {
+    @Binding var width: Double
+    var range: ClosedRange<Double>
+    var onEnd: () -> Void = {}
+    @State private var startWidth: Double?
+
+    var body: some View {
+        DividerGrip(axis: .columns) { translation in
+            guard let translation else {
+                startWidth = nil
+                onEnd()
+                return
+            }
+            let base = startWidth ?? width
+            if startWidth == nil { startWidth = width }
+            width = min(range.upperBound, max(range.lowerBound, base + translation))
+        }
+    }
+}
+
+/// A draggable divider that sets the height of the panel below it.
+struct HorizontalResizeHandle: View {
+    @Binding var height: Double
+    var range: ClosedRange<Double>
+    var onEnd: () -> Void = {}
+    @State private var startHeight: Double?
+
+    var body: some View {
+        DividerGrip(axis: .rows, color: .difHairline) { translation in
+            guard let translation else {
+                startHeight = nil
+                onEnd()
+                return
+            }
+            let base = startHeight ?? height
+            if startHeight == nil { startHeight = height }
+            height = min(range.upperBound, max(range.lowerBound, base - translation))
+        }
+    }
+}
+
+/// Section caption used above lists.
+struct SectionLabel: View {
+    var text: String
+    var body: some View {
+        Text(text.uppercased())
+            .font(.ui(size: 10.5, weight: .semibold))
+            .kerning(0.6)
+            .foregroundStyle(Color.difText3)
+    }
+}
+
+extension View {
+    /// The floating-panel look shared by every popup.
+    func popupPanel(cornerRadius: CGFloat = 14) -> some View {
+        self
+            .background(VisualEffect(material: .popover, blending: .withinWindow))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous).strokeBorder(Color.difHairline, lineWidth: 1))
+            .shadow(color: .black.opacity(0.35), radius: 30, y: 14)
+    }
+}

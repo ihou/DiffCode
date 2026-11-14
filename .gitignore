@@ -1,0 +1,27 @@
+.build/
+build/
+*.xcodeproj
+.swiftpm/
+.DS_Store
+dist/
+
+# Release secrets and local config (see release/macos/README.md, release/appstore/README.md)
+release/macos/.macos.env
+release/macos/AppInfo.local.env
+release/macos/*.p8
+release/keys/*.p8
+release/appstore/keys/*.p8
+release/local_config.json
+release/appstore/local_config.json
+release/appstore/profiles/
+release/appstore/.appstore.env
+release/appstore/*.p8
+
+# Signing keys, certificates and profiles never belong in the repository, wherever they are put.
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.local.env
+.env

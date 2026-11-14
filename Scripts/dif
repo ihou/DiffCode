@@ -1,0 +1,22 @@
+#!/bin/bash
+# Opens repositories in DiffCode:  dif            (the current directory)
+#                                  dif ~/work/app ~/work/lib
+set -euo pipefail
+
+paths=()
+for arg in "$@"; do
+    case "$arg" in
+        -h|--help) echo "usage: dif [directory ...]"; exit 0 ;;
+        *) paths+=("$(cd "$arg" 2>/dev/null && pwd || echo "$arg")") ;;
+    esac
+done
+[ ${#paths[@]} -eq 0 ] && paths=("$PWD")
+
+# Prefer the bundle this script ships in, so a copy outside /Applications still works.
+SELF="$(readlink "$0" 2>/dev/null || echo "$0")"
+BUNDLE="$(cd "$(dirname "$SELF")/../.." 2>/dev/null && pwd)"
+if [ -d "$BUNDLE/Contents/MacOS" ]; then
+    exec open -a "$BUNDLE" "${paths[@]}"
+fi
+# By identifier, so it finds the app whatever its file is called.
+exec open -b com.nanshanbei.DiffCode "${paths[@]}"

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- 官网下载版：不进沙盒（内置终端要以用户身份运行 shell），只开 Hardened Runtime，不需要额外权限。 -->
+<plist version="1.0">
+<dict>
+</dict>
+</plist>

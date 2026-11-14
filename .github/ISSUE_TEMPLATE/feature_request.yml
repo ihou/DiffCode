@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest something DiffCode should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation and what gets in your way today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: How you imagine it working. If another tool already does it well, tell us how.
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else

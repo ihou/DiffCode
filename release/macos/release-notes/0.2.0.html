@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>DiffCode 0.2.0</title>
+<style>
+  body { font: 13px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; margin: 12px 16px; }
+  h2 { font-size: 15px; margin: 0 0 6px; }
+  h3 { font-size: 13px; margin: 12px 0 4px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin: 2px 0; }
+  kbd { font: 12px ui-monospace, Menlo, monospace; }
+  hr { border: none; border-top: 1px solid rgba(128, 128, 128, 0.35); margin: 14px 0; }
+</style>
+</head>
+<body>
+<h2>DiffCode 0.2.0</h2>
+
+<h3>新功能</h3>
+<ul>
+  <li><b>只提交一部分</b>：在 diff 里按处、甚至按行取消勾选，这次只提交其余的改动，没提交的留在工作区。</li>
+  <li><b>分支与远程</b>：检出、新建分支、获取、拉取、推送（推送前先列出要推的提交）；本地改动挡路时，Smart Checkout 先暂存、切换后再恢复。<kbd>⌥⌘K</kbd> 提交并推送，<kbd>⇧⌘K</kbd> 推送。</li>
+  <li><b>合并冲突</b>：列表上方显示正在进行的合并或变基，可以继续或中止；每处冲突可以保留 HEAD、采用传入或两者都要，左边可在 HEAD、共同祖先和传入版本之间切换。</li>
+  <li><b>比较任意两个提交</b>：在提交历史或 Git 树里 <kbd>⌘</kbd> 点选两个提交，右键比较。</li>
+  <li><b>拖出文件</b>：从文件树和「本地变更」把文件拖到 Finder、聊天窗口或别的应用。</li>
+</ul>
+
+<h3>更轻</h3>
+<ul>
+  <li>启动内存从约 38 MB 降到约 30 MB。</li>
+  <li>应用体积从约 12 MB 降到约 8 MB。</li>
+  <li>空闲时不再定时唤醒。</li>
+</ul>
+
+<hr>
+
+<h3>What’s new</h3>
+<ul>
+  <li><b>Commit part of a file</b>: untick changes, or single lines, in the diff to leave them out; they stay in the working tree for a later commit.</li>
+  <li><b>Branches and remotes</b>: check out, create branches, fetch, pull and push (the commits to push are listed first). When local changes are in the way, Smart Checkout stashes them and brings them back after switching. <kbd>⌥⌘K</kbd> commits and pushes, <kbd>⇧⌘K</kbd> pushes.</li>
+  <li><b>Merge conflicts</b>: a banner shows a merge or rebase in progress, with Continue and Abort. Each conflict can keep HEAD, take the incoming side, or both; the left side switches between HEAD, the common ancestor and the incoming version.</li>
+  <li><b>Compare any two commits</b>: <kbd>⌘</kbd>-click two commits in the Log or the Git graph, then right-click.</li>
+  <li><b>Drag files out</b> of the file tree and the Changes list into Finder, a chat window or any other app.</li>
+</ul>
+
+<h3>Lighter</h3>
+<ul>
+  <li>Memory at startup: about 38 MB, down to about 30 MB.</li>
+  <li>App size: about 12 MB, down to about 8 MB.</li>
+  <li>No more periodic wake-ups while idle.</li>
+</ul>
+</body>
+</html>

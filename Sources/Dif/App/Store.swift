@@ -1,0 +1,825 @@
+import AppKit
+import Observation
+import SwiftUI
+
+enum Popup: Equatable {
+    case quickOpen
+    case findInPath
+    case goToLine
+    case keymap
+    case settings
+    /// Branches and the commit graph, dropped down from the branch button.
+    case gitGraph
+    /// A question or notice (`AppStore.dialog`).
+    case dialog
+}
+
+struct RecentFile: Hashable {
+    var projectID: UUID
+    var path: String
+}
+
+/// Application state: the project list, the viewer, and the transient popups.
+@MainActor
+@Observable
+final class AppStore {
+    static let shared = AppStore()
+
+    let settings = Settings.shared
+    let viewer = ViewerModel()
+    let quickOpen = QuickOpenModel()
+    let finder = FindInPathModel()
+    let terminals = TerminalManager()
+    let gitGraph = GitGraphModel()
+    /// Where each project's branch sits in the sidebar, in window coordinates: ⌥⌘B opens the graph under it.
+    @ObservationIgnored var branchLabelFrames: [UUID: CGRect] = [:]
+
+    var projects: [Project] = []
+    var selectedProjectID: UUID? { didSet { if selectedProjectID != oldValue { terminals.updatePolling() } } }
+    var popup: Popup?
+    var sidebarVisible = true
+    var listVisible = true
+    var toast: String?
+    /// A button shown with the toast ("Undo"); the toast stays up longer while it has one.
+    var toastAction: ToastAction?
+    var memoryMB: Double = 0
+    var titlebarHeight: CGFloat = 38
+    var listFocusToken = 0
+    var logFilesFocusToken = 0
+    /// Counts in a range of its own: the tree and the list are on screen together and must not answer each other's requests.
+    var treeFocusToken = 1_000_000
+    var isFullScreen = false
+    /// The App Store edition found no git it may run (the developer tools are not installed).
+    var gitMissing = false
+    /// The question on screen, while `popup == .dialog`.
+    var dialog: DialogRequest?
+    var dialogFocusToken = 4_000_000
+    /// Where the Git graph drops down from (window coordinates, top left); nil puts it under the title bar.
+    var gitGraphAnchor: CGPoint?
+    /// Bumped to put the keyboard in the commit message.
+    var commitFocusToken = 0
+    @ObservationIgnored var commitFocusRequestedAt: CFTimeInterval = 0
+
+    @ObservationIgnored var recent: [RecentFile] = []
+    /// Rollbacks and deletes that can still be undone, oldest first.
+    @ObservationIgnored var undoStack: [UndoItem] = []
+    /// One edit at a time: a second click while git is still working is ignored.
+    @ObservationIgnored var isApplyingEdit = false
+    @ObservationIgnored weak var window: NSWindow?
+    @ObservationIgnored private var toastWork: DispatchWorkItem?
+    @ObservationIgnored private var memoryTimer: Timer?
+    @ObservationIgnored private weak var responderBeforePopup: NSResponder?
+    @ObservationIgnored private var panelsBeforeMaximize: (sidebar: Bool, list: Bool)?
+
+    private init() {
+        viewer.settings = settings
+        viewer.onExit = { [weak self] in
+            guard let self else { return }
+            // Escape returns to wherever the file was picked: the tree, the commit's file list in Log, else the changes list.
+            if self.currentProject?.browsedPath != nil, self.sidebarVisible {
+                self.focusTree()
+            } else if self.currentProject?.tab == .log, self.listVisible {
+                self.logFilesFocusToken += 1
+            } else {
+                self.focusList()
+            }
+        }
+        viewer.onStepFile = { [weak self] delta in self?.stepFile(delta) ?? false }
+        viewer.onToast = { [weak self] text in self?.showToast(text) }
+        viewer.contextMenuProvider = { [weak self] in self?.viewerContextMenu() }
+        viewer.onRevertHunk = { [weak self] index in self?.rollbackHunk(index) }
+        viewer.onToggleCommitHunk = { [weak self] index in self?.toggleCommitHunk(index) }
+        viewer.onDocumentChanged = { [weak self] in self?.viewerDocumentChanged() }
+        // A save shows in the Changes list straight away, without waiting for the file watcher.
+        viewer.onFileWritten = { [weak self] root in self?.projects.first { $0.url == root }?.refresh() }
+        viewer.onOpenAnnotation = { [weak self] entry in self?.openAnnotation(entry) }
+        quickOpen.store = self
+        finder.store = self
+        terminals.store = self
+        gitGraph.store = self
+    }
+
+    var currentProject: Project? {
+        guard let id = selectedProjectID else { return nil }
+        return projects.first { $0.id == id }
+    }
+
+    func project(_ id: UUID) -> Project? { projects.first { $0.id == id } }
+
+    // MARK: Lifecycle
+
+    func bootstrap() {
+        let defaults = UserDefaults.standard
+        let access = FolderAccess.shared
+        access.restore()
+        gitMissing = !Git.isAvailable
+        for path in defaults.stringArray(forKey: "projects") ?? [] {
+            if !access.covers(path) {
+                // Kept, so the project is not lost; it asks for its folder when selected.
+                let project = Project(url: URL(fileURLWithPath: path))
+                project.needsAccess = true
+                install(project)
+                continue
+            }
+            guard FileManager.default.fileExists(atPath: path) else { continue }
+            install(Project(url: URL(fileURLWithPath: path)))
+        }
+        let last = defaults.string(forKey: "selectedProject")
+        selectedProjectID = (projects.first { $0.url.path == last } ?? projects.first)?.id
+        projects.forEach { $0.refresh() }
+        syncViewer()
+
+        memoryMB = Self.footprintMB()
+        visibilityChanged()
+    }
+
+    /// The app came to the front or went to the back, or the window was covered or uncovered. Periodic work runs
+    /// only while it can be seen, so an idle DiffCode in the background never wakes up.
+    func visibilityChanged() {
+        let visible = isWindowVisible
+        // The memory readout: live while DiffCode is in front, one last reading when it goes to the back.
+        if visible, NSApp.isActive {
+            if memoryTimer == nil {
+                updateMemoryReadout()
+                let timer = Timer(timeInterval: 3, repeats: true) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.updateMemoryReadout() }
+                }
+                timer.tolerance = 1
+                RunLoop.main.add(timer, forMode: .common)
+                memoryTimer = timer
+            }
+        } else if let timer = memoryTimer {
+            timer.invalidate()
+            memoryTimer = nil
+            updateMemoryReadout()
+        }
+        terminals.updatePolling()
+        if visible { windowBecameVisible() }
+    }
+
+    private func updateMemoryReadout() {
+        let value = Self.footprintMB()
+        if abs(value - memoryMB) >= 0.5 { memoryMB = value }
+    }
+
+    private func install(_ project: Project) {
+        project.onRefreshed = { [weak self] p in self?.projectDidRefresh(p) }
+        project.onInclusionChanged = { [weak self, weak project] in
+            if let self, let project, project === self.currentProject { self.updateCommitTicks() }
+        }
+        project.isVisibleProvider = { [weak self] in self?.isWindowVisible ?? true }
+        project.startWatching()
+        projects.append(project)
+    }
+
+    private func persistProjects() {
+        let defaults = UserDefaults.standard
+        defaults.set(projects.map(\.url.path), forKey: "projects")
+        defaults.set(currentProject?.url.path, forKey: "selectedProject")
+    }
+
+    var isWindowVisible: Bool {
+        guard let window else { return true }
+        return window.occlusionState.contains(.visible) && !NSApp.isHidden
+    }
+
+    /// Refreshes deferred while the window was hidden run now.
+    func windowBecameVisible() {
+        for project in projects where project.needsRefreshWhenVisible {
+            project.refresh()
+        }
+    }
+
+    static func footprintMB() -> Double {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let result = withUnsafeMutablePointer(to: &info) { pointer in
+            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count)
+            }
+        }
+        return result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : 0
+    }
+
+    // MARK: Projects
+
+    func presentAddProject() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = L("Add", "添加")
+        panel.message = L("Choose Git repositories, or a folder containing several.", "选择 Git 仓库，或包含多个仓库的文件夹。")
+        guard let window else {
+            if panel.runModal() == .OK { addProjects(panel.urls) }
+            return
+        }
+        panel.beginSheetModal(for: window) { [weak self] response in
+            if response == .OK { self?.addProjects(panel.urls) }
+        }
+    }
+
+    func addProjects(_ urls: [URL]) {
+        // In the sandbox the folders just chosen are open only now: keep them open for the next launches too.
+        let access = FolderAccess.shared
+        urls.forEach { access.remember($0) }
+        Task { @MainActor in
+            var landed: Project?
+            var rejected = 0
+            for url in urls {
+                var isDirectory: ObjCBool = false
+                guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+                let directory = isDirectory.boolValue ? url : url.deletingLastPathComponent()
+                var roots: [URL] = []
+                if let root = await Git.repositoryRoot(for: directory) {
+                    roots = [root]
+                } else {
+                    roots = Git.nestedRepositories(in: directory)
+                }
+                if roots.isEmpty {
+                    rejected += 1
+                    // A folder with no repository in it needs no access kept. (A file keeps its own: ~/.gitconfig.)
+                    if isDirectory.boolValue { access.release(url.path, keepingFor: self.projects.map(\.url.path)) }
+                }
+                for root in roots {
+                    let path = root.standardizedFileURL.path
+                    if !access.covers(path) {
+                        // A folder inside the repository was chosen, but the sandbox needs the repository's own.
+                        guard await self.requestAccess(to: root) else { continue }
+                    }
+                    if let existing = self.projects.first(where: { $0.url.path == path }) {
+                        self.unlockGrantedProjects()
+                        landed = landed ?? existing
+                        continue
+                    }
+                    let project = Project(url: root)
+                    self.install(project)
+                    project.refresh()
+                    landed = landed ?? project
+                }
+            }
+            if let landed {
+                self.select(landed)
+            } else if rejected > 0 {
+                if access.isNeeded {
+                    // The sandbox hides the folders above the one chosen, so a folder inside a repository looks like none.
+                    self.showToast(L("No Git repository found there · choose the repository's own folder",
+                                     "这里没有找到 Git 仓库 · 请选择仓库本身所在的文件夹"))
+                } else {
+                    self.showToast(L("No Git repository found there", "这里没有找到 Git 仓库"))
+                }
+            }
+            self.persistProjects()
+        }
+    }
+
+    func remove(_ project: Project) {
+        terminals.removeAll(for: project)
+        project.stopWatching()
+        projects.removeAll { $0.id == project.id }
+        FolderAccess.shared.release(project.url.path, keepingFor: projects.map(\.url.path))
+        if selectedProjectID == project.id {
+            selectedProjectID = projects.first?.id
+            syncViewer()
+        }
+        persistProjects()
+    }
+
+    func moveProjects(from source: IndexSet, to destination: Int) {
+        projects.move(fromOffsets: source, toOffset: destination)
+        persistProjects()
+    }
+
+    func select(_ project: Project) {
+        if selectedProjectID != project.id {
+            selectedProjectID = project.id
+            persistProjects()
+        }
+        project.refresh()
+        syncViewer()
+    }
+
+    func selectProject(offset: Int) {
+        guard !projects.isEmpty else { return }
+        let index = projects.firstIndex { $0.id == selectedProjectID } ?? 0
+        select(projects[(index + offset + projects.count) % projects.count])
+    }
+
+    func refreshCurrent() {
+        guard let project = currentProject else { return }
+        project.invalidateFiles()
+        project.refresh()
+        if project.tab == .log { project.loadLog(reset: true) }
+        viewer.reload()
+    }
+
+    private func projectDidRefresh(_ project: Project) {
+        guard project.id == selectedProjectID else { return }
+        if sidebarVisible { project.loadTree() }
+        syncViewer()
+        // A merge starting or ending, or a file's tick changing with its status, changes what can be picked.
+        updateCommitTicks()
+    }
+
+    // MARK: Viewer synchronisation
+
+    /// Points the viewer at whatever the current project's selection implies: the file being browsed
+    /// by path if there is one, otherwise the selection of the list column.
+    func syncViewer() {
+        guard let project = currentProject else {
+            viewer.clear()
+            return
+        }
+        viewer.setBaseStamp(project.status.headOID)
+        if let path = project.browsedPath {
+            let request = worktreeRequest(for: path, in: project)
+            if request.source == .file, !FileManager.default.fileExists(atPath: project.url.appendingPathComponent(path).path) {
+                // Deleted and committed, or gone with a checkout: nothing left to follow.
+                project.browsedPath = nil
+            } else {
+                // The same file, as a diff while it has local changes (an agent or an editor touched it)
+                // and as a plain file once it has none.
+                markInChanges(path, in: project)
+                if request == viewer.request {
+                    viewer.reloadIfStale(base: project.status.headOID)
+                } else {
+                    viewer.open(request, preserveScroll: viewer.request?.path == path && viewer.request?.root == project.url)
+                }
+                return
+            }
+        }
+        switch project.tab {
+        case .changes:
+            if let comparison = project.comparison {
+                syncComparison(project, comparison)
+                return
+            }
+            if let id = project.selectedChangeID {
+                if !id.hasPrefix("f:") { return } // a folder or group row; leave the viewer alone
+                if let change = project.changes.first(where: { ChangeRow.fileID($0.path) == id }) {
+                    show(change, in: project)
+                    return
+                }
+                // The file being edited left the list (typed back to what HEAD has): it stays on screen, and
+                // comes back into the list with the next keystroke that changes it.
+                if viewer.isEditing(root: project.url, path: String(id.dropFirst(2))) {
+                    viewer.reloadIfStale(base: project.status.headOID)
+                    return
+                }
+            }
+            let ordered = ChangeTree.orderedFiles(changes: project.changes, flat: settings.flatList,
+                                                  filter: project.filter, splitUnversioned: true)
+            if let first = ordered.first {
+                project.selectedChangeID = ChangeRow.fileID(first.path)
+                show(first, in: project)
+            } else {
+                project.selectedChangeID = nil
+                if project.hasLoaded || viewer.request?.root != project.url { viewer.clear() }
+            }
+        case .log:
+            if project.commits.isEmpty, !project.isLoadingLog { project.loadLog(reset: true) }
+            guard let commit = project.selectedCommit, let id = project.selectedCommitFileID,
+                  let change = project.commitFiles.first(where: { ChangeRow.fileID($0.path) == id }) else {
+                // Keep showing the previous commit's diff while the next one loads.
+                var showingCommit = false
+                if let current = viewer.request, current.root == project.url, case .commit = current.source { showingCommit = true }
+                if !showingCommit || project.selectedCommit == nil { viewer.clear() }
+                return
+            }
+            viewer.open(project.request(for: change, in: commit, ignoreWhitespace: settings.ignoreWhitespace))
+        }
+    }
+
+    private func show(_ change: FileChange, in project: Project) {
+        let request = project.request(for: change, ignoreWhitespace: settings.ignoreWhitespace)
+        if request == viewer.request {
+            viewer.reloadIfStale(base: project.status.headOID)
+        } else {
+            // Same file, different status (e.g. untracked → added): keep the reader's place.
+            let sameFile = viewer.request?.path == request.path && viewer.request?.root == request.root
+            viewer.open(request, preserveScroll: sameFile)
+        }
+    }
+
+    func changeSelectionChanged(_ project: Project) {
+        guard project.id == selectedProjectID, project.tab == .changes,
+              let id = project.selectedChangeID,
+              let change = project.changes.first(where: { ChangeRow.fileID($0.path) == id }) else { return }
+        // Picking another change ends browsing; the highlight following the browsed file does not.
+        if project.browsedPath != change.path { project.browsedPath = nil }
+        show(change, in: project)
+        noteRecent(project, change.path)
+        follow(change.path, in: project)
+    }
+
+    func commitSelectionChanged(_ project: Project) {
+        project.loadSelectedCommit { [weak self, weak project] in
+            guard let self, let project, project.id == self.selectedProjectID, project.tab == .log else { return }
+            self.syncViewer()
+        }
+    }
+
+    func commitFileSelectionChanged(_ project: Project) {
+        guard project.id == selectedProjectID, project.tab == .log else { return }
+        syncViewer()
+        if project.browsedPath == nil, let path = viewer.request?.path { follow(path, in: project) }
+    }
+
+    /// The user picked a commit or one of its files: the viewer goes back to following the Log.
+    func pickedInLog(_ project: Project, commitChanged: Bool) {
+        guard project.browsedPath != nil else { return }
+        project.browsedPath = nil
+        // A click on the row that is already selected changes nothing, so nothing else would bring its diff back.
+        if commitChanged { commitSelectionChanged(project) } else { commitFileSelectionChanged(project) }
+    }
+
+    /// Keeps the Changes list's highlight on the file the viewer shows, or on nothing when that file has no changes.
+    private func markInChanges(_ path: String, in project: Project) {
+        guard project.tab == .changes else { return }
+        if project.comparison != nil {
+            if project.compareChanges.contains(where: { $0.path == path }) {
+                for id in ChangeTree.ancestors(of: path, in: project.compareCollapsed) { project.compareCollapsed.remove(id) }
+                let id = ChangeRow.fileID(path)
+                if project.compareSelectedID != id { project.compareSelectedID = id }
+            } else if project.compareSelectedID != nil {
+                project.compareSelectedID = nil
+            }
+            return
+        }
+        if project.changes.contains(where: { $0.path == path }) {
+            for id in ChangeTree.ancestors(of: path, in: project.collapsed) { project.collapsed.remove(id) }
+            let id = ChangeRow.fileID(path)
+            if project.selectedChangeID != id { project.selectedChangeID = id }
+        } else if project.selectedChangeID != nil {
+            project.selectedChangeID = nil
+        }
+    }
+
+    /// "Always Select Opened File": the tree follows whatever the viewer shows.
+    private func follow(_ path: String, in project: Project) {
+        guard settings.followFile, sidebarVisible, project.treeSelectedID != TreeRow.fileID(path) else { return }
+        project.revealInTree(path, flash: false)
+    }
+
+    // MARK: File tree
+
+    /// How `path` is shown from the working tree: a diff while it has local changes, otherwise the file itself.
+    /// While the Changes tab compares with another commit, the diff is against that commit.
+    private func worktreeRequest(for path: String, in project: Project) -> DiffRequest {
+        if project.tab == .changes, let comparison = project.comparison {
+            if let change = project.comparedChange(path) {
+                return project.request(compared: change, with: comparison, ignoreWhitespace: settings.ignoreWhitespace)
+            }
+            return DiffRequest(root: project.url, path: path, oldPath: nil, kind: nil, source: .file)
+        }
+        if let change = project.changes.first(where: { $0.path == path }) {
+            return project.request(for: change, ignoreWhitespace: settings.ignoreWhitespace)
+        }
+        return DiffRequest(root: project.url, path: path, oldPath: nil, kind: nil, source: .file)
+    }
+
+    /// The user picked a row in the tree. Selecting a row from code (locating a file) does not come through here.
+    func treeSelectionChanged(_ project: Project) {
+        guard project.id == selectedProjectID, let id = project.treeSelectedID, id.hasPrefix("f:") else { return }
+        browse(String(id.dropFirst(2)), in: project, line: nil)
+    }
+
+    /// ⌥F1: select the file on screen in the tree, with its folders opened and scrolled into view.
+    func locateInTree() {
+        guard let project = currentProject else { return }
+        guard let path = viewer.request.flatMap({ $0.root == project.url ? $0.path : nil }) else {
+            focusTree()
+            return
+        }
+        if project.revealInTree(path, flash: true) {
+            focusTree()
+        } else {
+            showToast(L("This file is not in the working tree", "这个文件不在当前工作区里"))
+        }
+    }
+
+    func setTab(_ tab: ProjectTab) {
+        guard let project = currentProject else { return }
+        if !listVisible { listVisible = true }
+        if project.tab != tab {
+            project.tab = tab
+            project.browsedPath = nil
+            syncViewer()
+        }
+        focusList()
+    }
+
+    /// Moves to the next/previous file in the active list. Returns false at either end.
+    @discardableResult
+    func stepFile(_ delta: Int) -> Bool {
+        guard let project = currentProject else { return false }
+        let listed = project.comparison != nil ? project.compareChanges : project.changes
+        if let path = project.browsedPath, !(project.tab == .changes && listed.contains { $0.path == path }) {
+            // Browsing a file the list column does not hold: walk the files the tree shows.
+            let files = project.treeRows().filter { !$0.isDirectory }
+            guard !files.isEmpty else { return false }
+            let current = files.firstIndex { $0.path == path } ?? files.firstIndex { $0.id == project.treeSelectedID }
+            let index = current.map { $0 + delta } ?? (delta > 0 ? 0 : files.count - 1)
+            guard index >= 0, index < files.count else { return false }
+            project.treeSelectedID = files[index].id
+            treeSelectionChanged(project)
+            return true
+        }
+        switch project.tab {
+        case .changes where project.comparison != nil:
+            let files = ChangeTree.orderedFiles(changes: project.compareChanges, flat: settings.flatList,
+                                                filter: project.filter, splitUnversioned: true)
+            guard let target = neighbour(in: files, of: project.compareSelectedID, delta: delta) else { return false }
+            for id in ChangeTree.ancestors(of: target.path, in: project.compareCollapsed) { project.compareCollapsed.remove(id) }
+            project.compareSelectedID = ChangeRow.fileID(target.path)
+            compareSelectionChanged(project)
+        case .changes:
+            let files = ChangeTree.orderedFiles(changes: project.changes, flat: settings.flatList,
+                                                filter: project.filter, splitUnversioned: true)
+            guard let target = neighbour(in: files, of: project.selectedChangeID, delta: delta) else { return false }
+            for id in ChangeTree.ancestors(of: target.path, in: project.collapsed) { project.collapsed.remove(id) }
+            project.selectedChangeID = ChangeRow.fileID(target.path)
+            changeSelectionChanged(project)
+        case .log:
+            let files = ChangeTree.orderedFiles(changes: project.commitFiles, flat: settings.flatList,
+                                                filter: "", splitUnversioned: false)
+            guard let target = neighbour(in: files, of: project.selectedCommitFileID, delta: delta) else { return false }
+            for id in ChangeTree.ancestors(of: target.path, in: project.commitCollapsed) { project.commitCollapsed.remove(id) }
+            project.selectedCommitFileID = ChangeRow.fileID(target.path)
+            commitFileSelectionChanged(project)
+        }
+        return true
+    }
+
+    private func neighbour(in files: [FileChange], of selected: String?, delta: Int) -> FileChange? {
+        guard !files.isEmpty else { return nil }
+        let index: Int
+        if let current = files.firstIndex(where: { ChangeRow.fileID($0.path) == selected }) {
+            index = current + delta
+        } else {
+            index = delta > 0 ? 0 : files.count - 1
+        }
+        return index >= 0 && index < files.count ? files[index] : nil
+    }
+
+    /// Opens a file by path (from a search): as a diff when it has local changes, otherwise as a plain file.
+    func openFile(in project: Project, path: String, line: Int?) {
+        if selectedProjectID != project.id {
+            selectedProjectID = project.id
+            persistProjects()
+        }
+        browse(path, in: project, line: line)
+        follow(path, in: project)
+    }
+
+    private func browse(_ path: String, in project: Project, line: Int?) {
+        noteRecent(project, path)
+        project.browsedPath = path
+        viewer.setBaseStamp(project.status.headOID)
+        markInChanges(path, in: project)
+        let sameFile = viewer.request?.path == path && viewer.request?.root == project.url
+        viewer.open(worktreeRequest(for: path, in: project), line: line, preserveScroll: sameFile && line == nil)
+    }
+
+    func noteRecent(_ project: Project, _ path: String) {
+        let entry = RecentFile(projectID: project.id, path: path)
+        recent.removeAll { $0 == entry }
+        recent.insert(entry, at: 0)
+        if recent.count > 40 { recent.removeLast(recent.count - 40) }
+    }
+
+    // MARK: Panels and focus
+
+    func changeInterfaceFontSize(by delta: Double) {
+        let range = Settings.uiFontRange
+        let size = min(range.upperBound, max(range.lowerBound, settings.uiFontSize + delta))
+        guard size != settings.uiFontSize else { return }
+        settings.uiFontSize = size
+        settings.save()
+    }
+
+    func changeTerminalFontSize(by delta: Double) {
+        let range = Settings.terminalFontRange
+        let size = min(range.upperBound, max(range.lowerBound, settings.terminalFontSize + delta))
+        guard size != settings.terminalFontSize else { return }
+        settings.terminalFontSize = size
+        settings.save()
+        terminals.applyFont(size: size)
+    }
+
+    func toggleSidebar() {
+        withAnimation(.snappy(duration: 0.2)) { sidebarVisible.toggle() }
+    }
+
+    /// The custom list that has the keyboard, by the name it was given ("tree", "list", …).
+    var focusedListName: String? {
+        (window?.firstResponder as? KeyCatcher.CatcherView)?.identifier?.rawValue
+    }
+
+    /// ⌘0 / ⌘9: show that tool window, or hide the list if it is already showing it.
+    func toggleTab(_ tab: ProjectTab) {
+        guard let project = currentProject else { return }
+        if listVisible, project.tab == tab {
+            // As in the IDE: the first press brings the keyboard to the tool window, the next one hides it.
+            if let name = focusedListName, name != KeyboardListName.tree {
+                withAnimation(.snappy(duration: 0.2)) { listVisible = false }
+                viewer.focusCanvas()
+            } else {
+                focusList()
+            }
+        } else {
+            withAnimation(.snappy(duration: 0.2)) { listVisible = true }
+            setTab(tab)
+        }
+    }
+
+    /// ⌘1, the IDE's Project tool window: the file tree in the sidebar. Pressed again with the tree focused, it hides the sidebar.
+    func toggleFileTree() {
+        guard currentProject != nil else {
+            toggleSidebar()
+            return
+        }
+        if sidebarVisible, focusedListName == KeyboardListName.tree {
+            withAnimation(.snappy(duration: 0.2)) { sidebarVisible = false }
+            viewer.focusCanvas()
+        } else {
+            focusTree()
+        }
+    }
+
+    func focusTree() {
+        if !sidebarVisible { withAnimation(.snappy(duration: 0.2)) { sidebarVisible = true } }
+        currentProject?.loadTree()
+        treeFocusToken += 1
+        KeyCatcher.pending = (treeFocusToken, CACurrentMediaTime())
+    }
+
+    func toggleMaximizeViewer() {
+        withAnimation(.snappy(duration: 0.2)) {
+            if let saved = panelsBeforeMaximize, !sidebarVisible, !listVisible {
+                sidebarVisible = saved.sidebar
+                listVisible = saved.list
+                panelsBeforeMaximize = nil
+            } else {
+                panelsBeforeMaximize = (sidebarVisible, listVisible)
+                sidebarVisible = false
+                listVisible = false
+            }
+        }
+    }
+
+    func focusList() {
+        if !listVisible { withAnimation(.snappy(duration: 0.2)) { listVisible = true } }
+        listFocusToken += 1
+        KeyCatcher.pending = (listFocusToken, CACurrentMediaTime())
+    }
+
+    func focusViewer() {
+        viewer.focusCanvas()
+    }
+
+    // MARK: Popups
+
+    func present(_ kind: Popup) {
+        if popup == nil { responderBeforePopup = window?.firstResponder }
+        // Another popup over an unanswered question cancels the question, so whoever asked hears back.
+        if popup == .dialog, kind != .dialog, let request = dialog {
+            dialog = nil
+            request.onCancel()
+        }
+        if popup == .gitGraph, kind != .gitGraph { gitGraph.release() }
+        popup = kind
+    }
+
+    func dismissPopup(restoreFocus: Bool = true) {
+        guard popup != nil else { return }
+        let unanswered = popup == .dialog ? dialog : nil
+        if popup == .gitGraph { gitGraph.release() }
+        dialog = nil
+        popup = nil
+        if restoreFocus {
+            if let responder = responderBeforePopup as? NSView, responder.window != nil {
+                window?.makeFirstResponder(responder)
+            } else {
+                viewer.focusCanvas()
+            }
+        }
+        unanswered?.onCancel()
+    }
+
+    func showQuickOpen(_ scope: QuickOpenModel.Scope) {
+        guard currentProject != nil || scope == .actions else {
+            presentAddProject()
+            return
+        }
+        if popup == .quickOpen, quickOpen.scope == scope {
+            dismissPopup()
+            return
+        }
+        quickOpen.prepare(scope: scope)
+        present(.quickOpen)
+    }
+
+    func showFindInPath() {
+        guard currentProject != nil else { return }
+        let selected = viewer.container?.canvas.selectedText()
+        finder.prepare(seed: selected.flatMap { $0.contains("\n") || $0.isEmpty ? nil : $0 })
+        present(.findInPath)
+    }
+
+    func showToast(_ text: String, action: ToastAction? = nil) {
+        toastWork?.cancel()
+        toastAction = action
+        withAnimation(.snappy(duration: 0.2)) { toast = text }
+        let work = DispatchWorkItem { [weak self] in
+            withAnimation(.easeOut(duration: 0.25)) { self?.toast = nil }
+            self?.toastAction = nil
+        }
+        toastWork = work
+        // Long enough to reach for the button when there is one.
+        DispatchQueue.main.asyncAfter(deadline: .now() + (action == nil ? 2.6 : 6), execute: work)
+    }
+
+    func dismissToast() {
+        toastWork?.cancel()
+        withAnimation(.easeOut(duration: 0.2)) { toast = nil }
+        toastAction = nil
+    }
+
+    // MARK: File actions
+
+    var currentFileURL: URL? {
+        viewer.request.map { $0.root.appendingPathComponent($0.path) }
+    }
+
+    func copyPath(withLine: Bool = false) {
+        guard let request = viewer.request else { return }
+        var text = request.path
+        if withLine, let line = viewer.container?.canvas.currentLineNumber() { text += ":\(line)" }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        showToast(L("Copied \(text)", "已复制 \(text)"))
+    }
+
+    func revealInFinder() {
+        guard let url = currentFileURL else { return }
+        if FileManager.default.fileExists(atPath: url.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([url.deletingLastPathComponent()])
+        }
+    }
+
+    /// ⌥⌘T: types the file on screen — with the selected lines, if any — into the terminal, ready to hand to an agent.
+    func insertReferenceInTerminal() {
+        guard let project = currentProject, let request = viewer.request, request.root == project.url else { return }
+        var text = Shell.quote(request.path)
+        if let lines = viewer.container?.canvas.selectedLineRange() {
+            text += lines.count > 1 ? ":\(lines.lowerBound)-\(lines.upperBound)" : ":\(lines.lowerBound)"
+        }
+        terminals.type(text + " ", in: project)
+    }
+
+    func viewerContextMenu() -> NSMenu? {
+        guard viewer.request != nil else { return nil }
+        let menu = NSMenu()
+        if let canvas = viewer.container?.canvas, canvas.editSelection != nil {
+            menu.addItem(ClosureMenuItem(L("Cut", "剪切")) { [weak canvas] in canvas?.cut(nil) })
+            menu.addItem(ClosureMenuItem(L("Copy", "复制")) { [weak canvas] in canvas?.copy(nil) })
+            if NSPasteboard.general.availableType(from: [.string]) != nil {
+                menu.addItem(ClosureMenuItem(L("Paste", "粘贴")) { [weak canvas] in canvas?.paste(nil) })
+            }
+            menu.addItem(.separator())
+        } else if viewer.container?.canvas.selectedText() != nil {
+            menu.addItem(ClosureMenuItem(L("Copy", "复制")) { [weak self] in self?.viewer.container?.canvas.copy(nil) })
+            menu.addItem(.separator())
+        }
+        if let project = currentProject, let change = viewerChange(in: project) {
+            var added = false
+            if viewer.canRevertHunks, let hunk = viewer.container?.canvas.contextHunk {
+                menu.addItem(ClosureMenuItem(L("Rollback This Change", "回滚这一处变更")) { [weak self] in self?.rollbackHunk(hunk) })
+                added = true
+            }
+            if Self.canRollback(change) {
+                menu.addItem(ClosureMenuItem(L("Rollback File…", "回滚整个文件…")) { [weak self] in self?.rollback([change], in: project) })
+                added = true
+            }
+            if Self.canDelete(change) {
+                menu.addItem(ClosureMenuItem(L("Delete File…", "删除文件…")) { [weak self] in self?.delete([change], in: project) })
+                added = true
+            }
+            if added { menu.addItem(.separator()) }
+            if addCommitPickItems(to: menu, project: project) { menu.addItem(.separator()) }
+        }
+        if let project = currentProject { addHistoryItems(to: menu, project: project) }
+        menu.addItem(ClosureMenuItem(L("Select in File Tree", "在文件树中定位")) { [weak self] in self?.locateInTree() })
+        if AppEnvironment.hasTerminal {
+            menu.addItem(ClosureMenuItem(L("Insert Path into Terminal", "把路径插入终端")) { [weak self] in self?.insertReferenceInTerminal() })
+        }
+        menu.addItem(ClosureMenuItem(L("Reveal in Finder", "在 Finder 中显示")) { [weak self] in self?.revealInFinder() })
+        menu.addItem(.separator())
+        menu.addItem(ClosureMenuItem(L("Copy Path", "复制路径")) { [weak self] in self?.copyPath() })
+        menu.addItem(ClosureMenuItem(L("Copy Path with Line Number", "复制路径和行号")) { [weak self] in self?.copyPath(withLine: true) })
+        return menu
+    }
+}
