@@ -71,7 +71,7 @@ The repositories in the screenshots are made up for the purpose.
 
 ## Install
 
-**[Download DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.zip)** (signed and notarized by Apple, updates itself), unzip it and drag DiffCode to Applications. There is also an [installer package](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg), and the website is at [ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/).
+**[Download DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg)** (signed and notarized by Apple, updates itself) and open the installer. The website is at [ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/).
 
 It needs macOS 14 Sonoma or later on an Apple Silicon Mac (Intel Macs are untested). To open repositories from the terminal, link the `dif` command once:
 

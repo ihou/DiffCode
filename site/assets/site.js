@@ -21,9 +21,9 @@
     .then(function (release) {
       var version = String(release.tag_name || "").replace(/^v/, "");
       if (version) document.querySelectorAll("[data-version]").forEach(function (el) { el.textContent = version; });
-      var zip = (release.assets || []).filter(function (asset) { return asset.name === "DiffCode.zip"; })[0];
-      if (zip && zip.size) {
-        var size = (zip.size / 1048576).toFixed(1) + " MB";
+      var pkg = (release.assets || []).filter(function (asset) { return asset.name === "DiffCode.pkg"; })[0];
+      if (pkg && pkg.size) {
+        var size = (pkg.size / 1048576).toFixed(1);
         document.querySelectorAll("[data-size]").forEach(function (el) { el.textContent = size; });
       }
     })

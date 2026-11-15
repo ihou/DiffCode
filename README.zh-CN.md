@@ -71,7 +71,7 @@ AI 写的代码越来越多，同事也在不停地推提交，每天花在看 d
 
 ## 安装
 
-**[下载 DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.zip)**（经过 Apple 签名和公证，会自动更新），解压后把 DiffCode 拖进「应用程序」。也可以用[安装包](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg)。官网：[ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/zh/)。
+**[下载 DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg)**（经过 Apple 签名和公证，会自动更新），打开安装包按提示安装即可。官网：[ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/zh/)。
 
 需要 macOS 14 Sonoma 及以上、Apple Silicon 的 Mac（Intel 未测试）。想在终端里打开仓库，先链接一次 `dif` 命令：
 
