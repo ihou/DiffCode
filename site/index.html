@@ -77,6 +77,26 @@
 </script>
 </head>
 <body>
+<svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="3.5"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2.5 5 13.5h6l-1 8 8-11h-6l1-8z"/></symbol>
+  <symbol id="i-commit" viewBox="0 0 24 24"><path d="m9 11.5 2.5 2.5L20 5.5"/><path d="M20 12.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="m7.5 9.5 3 2.5-3 2.5"/><path d="M13 15h4"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5.5" r="2.2"/><circle cx="6" cy="18.5" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.7v8.6"/><path d="M18 10.2c0 4.3-4.5 5-10 6.6"/></symbol>
+  <symbol id="i-merge" viewBox="0 0 24 24"><circle cx="6" cy="5.5" r="2.2"/><circle cx="6" cy="18.5" r="2.2"/><circle cx="18" cy="13" r="2.2"/><path d="M6 7.7v8.6"/><path d="M7.4 7.2C9 11 12 13 15.8 13"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/></symbol>
+  <symbol id="i-columns" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16"/><path d="M6.5 9h3M6.5 13h3M14.5 9h3M14.5 13h3"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 8-4 4 4 4"/><path d="m16 8 4 4-4 4"/><path d="m13.5 5-3 14"/></symbol>
+  <symbol id="i-stash" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/></symbol>
+  <symbol id="i-prompt" viewBox="0 0 24 24"><path d="m5 7 5 5-5 5"/><path d="M12 18h7"/></symbol>
+  <symbol id="i-theme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+</svg>
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="nav">
@@ -96,30 +116,33 @@
 
 <section class="hero">
   <div class="wrap">
-    <p class="kicker">DiffCode · Free and open source</p>
-    <h1>An IDE-grade Git diff viewer for&nbsp;Mac, without the&nbsp;IDE.</h1>
+    <a class="badge" href="https://github.com/ihou/DiffCode/releases/latest"><span class="badge-tag">New</span>What's new in <span data-version>0.3.0</span><span class="badge-arrow" aria-hidden="true">›</span></a>
+    <h1>An IDE-grade Git diff viewer for&nbsp;Mac, <span class="grad">without the&nbsp;IDE.</span></h1>
     <p class="lede">DiffCode is a lightweight, native Git client for macOS. Review every change side by side — yours, your teammates' or your coding agent's — and commit exactly the lines you mean, in about <strong>30–50 MB</strong> of memory.</p>
     <div class="cta">
-      <a class="btn" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg">Download for Mac<span class="btn-size"><span data-size>4.0</span> MB</span></a>
+      <a class="btn" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><svg class="i"><use href="#i-down"/></svg>Download for Mac<span class="btn-size"><span data-size>4.0</span> MB</span></a>
       <a class="more" href="https://github.com/ihou/DiffCode">View the source on GitHub</a>
     </div>
     <ul class="facts">
-      <li>Version <span data-version>0.3.0</span></li>
+      <li>Free and open source</li>
       <li>macOS 14 or later</li>
       <li>Apple Silicon</li>
       <li>Updates itself</li>
     </ul>
   </div>
-  <div class="wide hero-shot">
+  <div class="stage">
     <img class="window" src="images/hero.png" width="2000" height="1250" fetchpriority="high" alt="DiffCode, a Git diff viewer for Mac, showing a side-by-side diff of a Kotlin file with one line left out of the commit">
+    <div class="chip chip-files" aria-hidden="true"><span class="chip-ico"><svg class="i"><use href="#i-check"/></svg></span><span><b>4 files to commit</b><small>1 of them in part</small></span></div>
+    <div class="chip chip-line" aria-hidden="true"><span class="chip-ico"><svg class="i"><use href="#i-box"/></svg></span><span><b>Line 47 left out</b><small>The rest is committed</small></span></div>
+    <div class="chip chip-mem" aria-hidden="true"><span class="chip-ico"><svg class="i"><use href="#i-bolt"/></svg></span><span><b>47 MB in use</b><small>Native AppKit</small></span></div>
   </div>
 </section>
 
-<section class="section size" id="size">
+<section class="size-band" id="size">
   <div class="wrap">
     <div class="reveal">
-      <p class="size-label">The whole installer</p>
-      <p class="size-num"><span data-size-round>4</span><small>MB</small></p>
+      <span class="eyebrow">The whole installer</span>
+      <p class="size-num"><span class="grad"><span data-size-round>4</span></span><small>MB</small></p>
       <h2>Small enough to just try.</h2>
       <p class="size-text">IDE installers often run to a gigabyte or more. DiffCode's installer is about 4&nbsp;MB, with no account and nothing to set up: download it, open a repository, and if it isn't for you, drag it to the Trash.</p>
     </div>
@@ -133,35 +156,38 @@
 <section class="section" id="why">
   <div class="wrap">
     <div class="head reveal">
+      <span class="eyebrow">Why DiffCode</span>
       <h2>Your IDE can show a Git diff. <span class="muted">It's just heavy.</span></h2>
       <p>Opening an IDE to see what changed also starts code completion, builds, indexing and a pile of plugins: a long wait and several gigabytes of memory. With coding agents and teammates writing more of the code, you review changes all day. DiffCode is the lightweight option: it keeps only the part you came for — the Git diff, the commit and the history.</p>
+    </div>
+    <div class="split reveal">
+      <div class="split-col">
+        <div class="split-head"><span class="file"><i class="dot" style="--c: #ef6b62"></i>Your IDE</span><span class="n minus">−6</span></div>
+        <ul class="split-body" aria-label="Left out">
+          <li class="sl sl-del"><b>−</b><span>Code completion</span></li>
+          <li class="sl sl-del"><b>−</b><span>Compiler and builds</span></li>
+          <li class="sl sl-del"><b>−</b><span>Indexing</span></li>
+          <li class="sl sl-del"><b>−</b><span>Plugins</span></li>
+          <li class="sl sl-del"><b>−</b><span>Debugger</span></li>
+          <li class="sl sl-del"><b>−</b><span>Several gigabytes of memory</span></li>
+        </ul>
+      </div>
+      <div class="split-col">
+        <div class="split-head"><span class="file"><i class="dot" style="--c: #74c07f"></i>DiffCode</span><span class="n plus">+6</span></div>
+        <ul class="split-body" aria-label="Kept">
+          <li class="sl sl-add"><b>+</b><span>A side-by-side diff you can edit</span></li>
+          <li class="sl sl-add"><b>+</b><span>Commits down to single lines</span></li>
+          <li class="sl sl-add"><b>+</b><span>Git history and the commit graph</span></li>
+          <li class="sl sl-add"><b>+</b><span>A terminal for your coding agents</span></li>
+          <li class="sl sl-add"><b>+</b><span>Search across every repository</span></li>
+          <li class="sl sl-add"><b>+</b><span>About 30–50 MB of memory</span></li>
+        </ul>
+      </div>
     </div>
     <div class="stats reveal">
       <div class="stat"><b>30–50<small>MB</small></b><span>of memory in everyday use</span></div>
       <div class="stat"><b>40<small>ms</small></b><span>to open a 30,000-line diff</span></div>
       <div class="stat"><b>0</b><span>writes to your repository until you act</span></div>
-    </div>
-    <div class="ledger">
-      <div class="drop reveal">
-        <h3>Left out</h3>
-        <ul>
-          <li><i>✕</i>Code completion</li>
-          <li><i>✕</i>Compiler and builds</li>
-          <li><i>✕</i>Indexing</li>
-          <li><i>✕</i>Plugins</li>
-          <li><i>✕</i>Debugger</li>
-        </ul>
-      </div>
-      <div class="keep reveal">
-        <h3>Kept</h3>
-        <ul>
-          <li><i>✓</i>A side-by-side diff you can edit</li>
-          <li><i>✓</i>Commits down to single lines</li>
-          <li><i>✓</i>Git history and the commit graph</li>
-          <li><i>✓</i>A terminal for your coding agents</li>
-          <li><i>✓</i>Search across every repository</li>
-        </ul>
-      </div>
     </div>
   </div>
 </section>
@@ -169,13 +195,14 @@
 <section class="section" id="features">
   <div class="wide">
     <div class="head reveal">
+      <span class="eyebrow">Features</span>
       <h2>Everything a code review needs. <span class="muted">Nothing it doesn't.</span></h2>
       <p>DiffCode is a Git diff viewer first and a Git client second. Every feature is about reading a change, deciding what to keep and committing it.</p>
     </div>
     <div class="tiles">
       <article class="tile span reveal">
         <div class="text">
-          <span class="label">Partial commits</span>
+          <div class="tile-top"><span class="tile-ico" style="--c: #2f6bff"><svg class="i"><use href="#i-commit"/></svg></span><span class="label">Partial commits</span></div>
           <h3>Commit only the lines you choose.</h3>
           <p>Untick a hunk, or select a few lines and leave them out. Only the rest is committed; what you left out stays in your working tree for the next commit.</p>
           <ul>
@@ -198,29 +225,29 @@
         </div>
       </article>
 
-      <article class="tile reveal">
-        <span class="label">Made for coding agents</span>
+      <article class="tile dark reveal">
+        <div class="tile-top"><span class="tile-ico" style="--c: #12b886"><svg class="i"><use href="#i-term"/></svg></span><span class="label">Made for coding agents</span></div>
         <h3>See what your coding agent changed.</h3>
         <p>Run Claude Code, Codex or any command-line agent in the built-in terminal. Every file it touches shows up in the diff above as it works: fix a line, roll back what you don't want, commit what you approve.</p>
         <div class="shot"><div class="crop" style="--z:1.6;--x:0%;--y:-31.25%"><img src="images/terminal.png" width="2000" height="1250" loading="lazy" decoding="async" alt="The built-in terminal in DiffCode running a script while the Git diff above updates"></div></div>
       </article>
 
       <article class="tile reveal">
-        <span class="label">Git history</span>
+        <div class="tile-top"><span class="tile-ico" style="--c: #7c5cff"><svg class="i"><use href="#i-branch"/></svg></span><span class="label">Git history</span></div>
         <h3>Branches and history, one click away.</h3>
         <p>Click the branch name for the Git graph in a dropdown — branches, tags and remotes on the left, commits on the right. Check out, merge, rebase, cherry-pick, revert or reset, each with Undo.</p>
         <div class="shot"><div class="crop" style="--z:1.5;--x:-3%;--y:-8%"><img src="images/git-graph.png" width="2000" height="1250" loading="lazy" decoding="async" alt="The Git graph dropdown in DiffCode with branches, tags and the commit graph"></div></div>
       </article>
 
       <article class="tile reveal">
-        <span class="label">Merge conflicts</span>
+        <div class="tile-top"><span class="tile-ico" style="--c: #f08c00"><svg class="i"><use href="#i-merge"/></svg></span><span class="label">Merge conflicts</span></div>
         <h3>Resolve merge conflicts one at a time.</h3>
         <p>Every conflict gets Keep HEAD, Take Incoming and Both. A banner keeps the merge or rebase in view, with Continue, Skip and Abort, and Commit Merge when you are done.</p>
         <div class="shot"><div class="crop" style="--z:1.6;--x:-37.5%;--y:0%"><img src="images/merge-conflict.png" width="2000" height="1250" loading="lazy" decoding="async" alt="Resolving a Git merge conflict in DiffCode with Keep HEAD, Take Incoming and Both"></div></div>
       </article>
 
       <article class="tile reveal">
-        <span class="label">All your repositories</span>
+        <div class="tile-top"><span class="tile-ico" style="--c: #0ea5e9"><svg class="i"><use href="#i-search"/></svg></span><span class="label">All your repositories</span></div>
         <h3>Every repository in one window.</h3>
         <p>The sidebar lists your projects with branch, ahead and behind, and change counts. Search Everywhere with <kbd>⇧⇧</kbd>, go to a file with camel-case matching, or find in files across every project with <code>git grep</code>.</p>
         <div class="shot"><div class="crop" style="--z:1.5;--x:-16.7%;--y:-4.5%"><img src="images/find-in-files.png" width="2000" height="1250" loading="lazy" decoding="async" alt="Find in Files across Git repositories in DiffCode, with a result list and a preview"></div></div>
@@ -232,15 +259,16 @@
 <section class="section" id="details">
   <div class="wrap">
     <div class="head reveal">
+      <span class="eyebrow">Details</span>
       <h2>The details of a good diff viewer.</h2>
     </div>
     <div class="cards">
-      <div class="card reveal"><h3>Edit in place</h3><p>Type into the working-tree side of the diff. It saves after a second of idle and keeps encoding and line endings byte for byte.</p></div>
-      <div class="card reveal"><h3>Side-by-side or unified diff</h3><p>Word-level highlights, curved connectors and an overview bar. <kbd>⌥⌘V</kbd> switches between the two views.</p></div>
-      <div class="card reveal"><h3>Syntax highlighting for your stack</h3><p>Kotlin, Java, Swift, TypeScript, Python, Go, Rust, C/C++, C#, Dart and more. Image diffs too, and you can ignore whitespace.</p></div>
-      <div class="card reveal"><h3>Stash</h3><p>Stash local changes, then apply, pop or drop them from a list. Dropping a stash can be undone.</p></div>
-      <div class="card reveal"><h3>Open from the terminal</h3><p>Run <code>dif</code> in a repository, or <code>dif ~/work/app ~/work/lib</code>, to open it in DiffCode. Or drag folders into the sidebar.</p></div>
-      <div class="card reveal"><h3>Light or dark, English or 中文</h3><p>Dark, light or follow the system, with separate font sizes for code, interface and terminal. The language follows your Mac.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #2f6bff"><svg class="i"><use href="#i-edit"/></svg></span><h3>Edit in place</h3><p>Type into the working-tree side of the diff. It saves after a second of idle and keeps encoding and line endings byte for byte.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #12b886"><svg class="i"><use href="#i-columns"/></svg></span><h3>Side-by-side or unified diff</h3><p>Word-level highlights, curved connectors and an overview bar. <kbd>⌥⌘V</kbd> switches between the two views.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #7c5cff"><svg class="i"><use href="#i-code"/></svg></span><h3>Syntax highlighting for your stack</h3><p>Kotlin, Java, Swift, TypeScript, Python, Go, Rust, C/C++, C#, Dart and more. Image diffs too, and you can ignore whitespace.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #f08c00"><svg class="i"><use href="#i-stash"/></svg></span><h3>Stash</h3><p>Stash local changes, then apply, pop or drop them from a list. Dropping a stash can be undone.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #0ea5e9"><svg class="i"><use href="#i-prompt"/></svg></span><h3>Open from the terminal</h3><p>Run <code>dif</code> in a repository, or <code>dif ~/work/app ~/work/lib</code>, to open it in DiffCode. Or drag folders into the sidebar.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #e64980"><svg class="i"><use href="#i-theme"/></svg></span><h3>Light or dark, English or 中文</h3><p>Dark, light or follow the system, with separate font sizes for code, interface and terminal. The language follows your Mac.</p></div>
     </div>
   </div>
 </section>
@@ -248,6 +276,7 @@
 <section class="section" id="keyboard">
   <div class="wrap">
     <div class="head reveal">
+      <span class="eyebrow">Keyboard</span>
       <h2>Your hands stay on the keys.</h2>
       <p>Every action in DiffCode has a keyboard shortcut. Press <kbd>⌘/</kbd> in the app to see them all.</p>
     </div>
@@ -267,20 +296,23 @@
 <section class="section" id="privacy">
   <div class="wrap">
     <div class="head reveal">
+      <span class="eyebrow">Privacy</span>
       <h2>Your code stays on your Mac.</h2>
     </div>
     <div class="cards">
-      <div class="card reveal"><h3>No account, no telemetry</h3><p>DiffCode goes online only when you fetch, pull or push — through your own git, credentials and SSH agent — and to check for updates.</p></div>
-      <div class="card reveal"><h3>Read-only until you act</h3><p>Refreshing, diffing and searching never write to your repository or take <code>index.lock</code>, so it can stay open next to your IDE and agents.</p></div>
-      <div class="card reveal"><h3>Everything can be undone</h3><p>Rollbacks, deletes and history edits come with Undo. Deleted files go to the Trash, and risky steps ask first.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #2f6bff"><svg class="i"><use href="#i-lock"/></svg></span><h3>No account, no telemetry</h3><p>DiffCode goes online only when you fetch, pull or push — through your own git, credentials and SSH agent — and to check for updates.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #12b886"><svg class="i"><use href="#i-eye"/></svg></span><h3>Read-only until you act</h3><p>Refreshing, diffing and searching never write to your repository or take <code>index.lock</code>, so it can stay open next to your IDE and agents.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #7c5cff"><svg class="i"><use href="#i-undo"/></svg></span><h3>Everything can be undone</h3><p>Rollbacks, deletes and history edits come with Undo. Deleted files go to the Trash, and risky steps ask first.</p></div>
     </div>
   </div>
 </section>
 
 <section class="section" id="faq">
-  <div class="wrap">
-    <div class="head reveal">
+  <div class="wrap faq-wrap">
+    <div class="faq-side reveal">
+      <span class="eyebrow">FAQ</span>
       <h2>Frequently asked questions</h2>
+      <p>Something else? Ask in <a href="https://github.com/ihou/DiffCode/discussions">GitHub Discussions</a> or <a href="https://github.com/ihou/DiffCode/issues">open an issue</a>.</p>
     </div>
     <div class="faq">
       <div class="qa"><h3>Is DiffCode free?</h3><p>Yes. DiffCode is free and open source under the GNU General Public License v3.0. There is no account, subscription or paid tier, and the source code is on GitHub.</p></div>
@@ -297,15 +329,17 @@
 </section>
 
 <section class="download" id="download">
-  <div class="wrap">
-    <img class="icon reveal" src="images/icon.png" width="112" height="112" loading="lazy" alt="DiffCode app icon">
-    <h2 class="reveal">Download DiffCode for Mac.</h2>
-    <p class="lede reveal">Free and open source. Signed and notarized by Apple, and it keeps itself up to date.</p>
-    <div class="cta reveal">
-      <a class="btn" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><span>Download DiffCode <span data-version>0.3.0</span></span><span class="btn-size"><span data-size>4.0</span> MB</span></a>
+  <div class="wide">
+    <div class="final reveal">
+      <img class="icon" src="images/icon.png" width="120" height="120" loading="lazy" alt="DiffCode app icon">
+      <h2 class="reveal">Download DiffCode for Mac.</h2>
+      <p class="lede">Free and open source. Signed and notarized by Apple, and it keeps itself up to date.</p>
+      <div class="cta">
+        <a class="btn" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><svg class="i"><use href="#i-down"/></svg><span>Download DiffCode <span data-version>0.3.0</span></span><span class="btn-size"><span data-size>4.0</span> MB</span></a>
+      </div>
+      <p class="small">Open DiffCode.pkg and follow the installer. macOS 14 Sonoma or later, Apple Silicon.<br>
+        <a href="https://github.com/ihou/DiffCode/releases/latest">Release notes</a> · <a href="https://github.com/ihou/DiffCode#build-from-source">Build from source</a> · <a href="https://github.com/ihou/DiffCode/releases">All versions</a></p>
     </div>
-    <p class="small reveal">Open DiffCode.pkg and follow the installer. macOS 14 Sonoma or later, Apple Silicon.<br>
-      <a href="https://github.com/ihou/DiffCode/releases/latest">Release notes</a> · <a href="https://github.com/ihou/DiffCode#build-from-source">Build from source</a> · <a href="https://github.com/ihou/DiffCode/releases">All versions</a></p>
   </div>
 </section>
 
