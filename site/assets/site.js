@@ -25,6 +25,8 @@
       if (pkg && pkg.size) {
         var size = (pkg.size / 1048576).toFixed(1);
         document.querySelectorAll("[data-size]").forEach(function (el) { el.textContent = size; });
+        var rounded = String(Math.max(1, Math.round(pkg.size / 1048576)));
+        document.querySelectorAll("[data-size-round]").forEach(function (el) { el.textContent = rounded; });
       }
     })
     .catch(function () { /* keep the built-in text */ });

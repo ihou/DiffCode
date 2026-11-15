@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>DiffCode — Free Git Diff Viewer &amp; Git Client for Mac</title>
-<meta name="description" content="Free, lightweight Git diff viewer and Git client for Mac. Review side-by-side diffs, commit only the lines you choose, and see what coding agents changed.">
+<meta name="description" content="Free, lightweight Git diff viewer and Git client for Mac, only 4 MB. Review side-by-side diffs, commit just the lines you choose, see what AI agents changed.">
 <meta name="theme-color" content="#ffffff">
 <link rel="canonical" href="https://ihou.github.io/DiffCode/">
 <link rel="alternate" hreflang="en" href="https://ihou.github.io/DiffCode/">
@@ -15,7 +15,7 @@
 <meta property="og:locale" content="en_US">
 <meta property="og:locale:alternate" content="zh_CN">
 <meta property="og:title" content="DiffCode — Free Git Diff Viewer &amp; Git Client for Mac">
-<meta property="og:description" content="An IDE-grade Git diff, without the IDE. Review every change and commit exactly the lines you mean, in a native Mac app that uses about 30–50 MB of memory.">
+<meta property="og:description" content="An IDE-grade Git diff, without the IDE. A 4 MB native Mac app that shows every change and commits exactly the lines you mean.">
 <meta property="og:url" content="https://ihou.github.io/DiffCode/">
 <meta property="og:image" content="https://ihou.github.io/DiffCode/images/social-preview.png">
 <meta property="og:image:width" content="1280">
@@ -47,6 +47,7 @@
   "applicationSubCategory": "Git client",
   "operatingSystem": "macOS 14 or later",
   "processorRequirements": "Apple Silicon",
+  "fileSize": "4 MB",
   "downloadUrl": "https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg",
   "screenshot": "https://ihou.github.io/DiffCode/images/hero.png",
   "image": "https://ihou.github.io/DiffCode/images/social-preview.png",
@@ -65,6 +66,7 @@
     { "@type": "Question", "name": "Is DiffCode free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. DiffCode is free and open source under the GNU General Public License v3.0. There is no account, subscription or paid tier, and the source code is on GitHub." } },
     { "@type": "Question", "name": "What is DiffCode for?", "acceptedAnswer": { "@type": "Answer", "text": "It is a Git diff viewer and Git client for reviewing and committing changes on a Mac. It shows side-by-side or unified diffs, lets you edit and commit selected lines, and handles branches, history, stash and merge conflicts. It is not a code editor or an IDE." } },
     { "@type": "Question", "name": "How is it different from opening my IDE?", "acceptedAnswer": { "@type": "Answer", "text": "An IDE also starts code completion, builds, indexing and plugins, and often takes several gigabytes of memory. DiffCode keeps only the diff, the commit, the history and a terminal, so it opens quickly and uses about 30–50 MB." } },
+    { "@type": "Question", "name": "How big is DiffCode?", "acceptedAnswer": {"@type": "Answer", "text": "The installer is about 4 MB, and the installed app is about 8 MB. DiffCode is a native AppKit app with no bundled browser engine or runtime, which is also why it starts quickly and uses about 30–50 MB of memory."}},
     { "@type": "Question", "name": "Can I review changes made by Claude Code or Codex?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Run the agent in DiffCode's built-in terminal, or anywhere else, and every file it changes appears in the diff as it works. Compare with Branch shows everything since the agent's branch split off." } },
     { "@type": "Question", "name": "Can I commit only part of a file?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Untick a hunk, or select lines and leave them out of the commit. Those changes stay in your working tree for later." } },
     { "@type": "Question", "name": "Does DiffCode change my repository?", "acceptedAnswer": { "@type": "Answer", "text": "Not until you act. Refreshing, diffing and searching never write to the repository or take index.lock, so DiffCode can stay open next to your IDE, terminal and agents." } },
@@ -98,7 +100,7 @@
     <h1>An IDE-grade Git diff viewer for&nbsp;Mac, without the&nbsp;IDE.</h1>
     <p class="lede">DiffCode is a lightweight, native Git client for macOS. Review every change side by side — yours, your teammates' or your coding agent's — and commit exactly the lines you mean, in about <strong>30–50 MB</strong> of memory.</p>
     <div class="cta">
-      <a class="btn" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg">Download for Mac</a>
+      <a class="btn" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg">Download for Mac<span class="btn-size"><span data-size>4.0</span> MB</span></a>
       <a class="more" href="https://github.com/ihou/DiffCode">View the source on GitHub</a>
     </div>
     <ul class="facts">
@@ -113,6 +115,21 @@
   </div>
 </section>
 
+<section class="section size" id="size">
+  <div class="wrap">
+    <div class="reveal">
+      <p class="size-label">The whole installer</p>
+      <p class="size-num"><span data-size-round>4</span><small>MB</small></p>
+      <h2>Small enough to just try.</h2>
+      <p class="size-text">IDE installers often run to a gigabyte or more. DiffCode's installer is about 4&nbsp;MB, with no account and nothing to set up: download it, open a repository, and if it isn't for you, drag it to the Trash.</p>
+    </div>
+    <div class="weigh reveal" role="img" aria-label="Download size: DiffCode about 4 MB, a typical IDE a gigabyte or more">
+      <div class="weigh-row us"><span class="weigh-name">DiffCode</span><span class="weigh-bar"><i></i></span><span class="weigh-val"><span data-size>4.0</span> MB</span></div>
+      <div class="weigh-row"><span class="weigh-name">A typical IDE</span><span class="weigh-bar"><i></i></span><span class="weigh-val">1 GB+</span></div>
+    </div>
+  </div>
+</section>
+
 <section class="section" id="why">
   <div class="wrap">
     <div class="head reveal">
@@ -122,7 +139,7 @@
     <div class="stats reveal">
       <div class="stat"><b>30–50<small>MB</small></b><span>of memory in everyday use</span></div>
       <div class="stat"><b>40<small>ms</small></b><span>to open a 30,000-line diff</span></div>
-      <div class="stat"><b><span data-size>4.0</span><small>MB</small></b><span>download, native AppKit</span></div>
+      <div class="stat"><b>0</b><span>writes to your repository until you act</span></div>
     </div>
     <div class="ledger">
       <div class="drop reveal">
@@ -269,6 +286,7 @@
       <div class="qa"><h3>Is DiffCode free?</h3><p>Yes. DiffCode is free and open source under the GNU General Public License v3.0. There is no account, subscription or paid tier, and the source code is on GitHub.</p></div>
       <div class="qa"><h3>What is DiffCode for?</h3><p>It is a Git diff viewer and Git client for reviewing and committing changes on a Mac. It shows side-by-side or unified diffs, lets you edit and commit selected lines, and handles branches, history, stash and merge conflicts. It is not a code editor or an IDE.</p></div>
       <div class="qa"><h3>How is it different from opening my IDE?</h3><p>An IDE also starts code completion, builds, indexing and plugins, and often takes several gigabytes of memory. DiffCode keeps only the diff, the commit, the history and a terminal, so it opens quickly and uses about 30–50 MB.</p></div>
+      <div class="qa"><h3>How big is DiffCode?</h3><p>The installer is about 4 MB, and the installed app is about 8 MB. DiffCode is a native AppKit app with no bundled browser engine or runtime, which is also why it starts quickly and uses about 30–50 MB of memory.</p></div>
       <div class="qa"><h3>Can I review changes made by Claude Code or Codex?</h3><p>Yes. Run the agent in DiffCode's built-in terminal, or anywhere else, and every file it changes appears in the diff as it works. Compare with Branch shows everything since the agent's branch split off.</p></div>
       <div class="qa"><h3>Can I commit only part of a file?</h3><p>Yes. Untick a hunk, or select lines and leave them out of the commit. Those changes stay in your working tree for later.</p></div>
       <div class="qa"><h3>Does DiffCode change my repository?</h3><p>Not until you act. Refreshing, diffing and searching never write to the repository or take <code>index.lock</code>, so DiffCode can stay open next to your IDE, terminal and agents.</p></div>
@@ -284,7 +302,7 @@
     <h2 class="reveal">Download DiffCode for Mac.</h2>
     <p class="lede reveal">Free and open source. Signed and notarized by Apple, and it keeps itself up to date.</p>
     <div class="cta reveal">
-      <a class="btn" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><span>Download DiffCode <span data-version>0.3.0</span></span></a>
+      <a class="btn" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><span>Download DiffCode <span data-version>0.3.0</span></span><span class="btn-size"><span data-size>4.0</span> MB</span></a>
     </div>
     <p class="small reveal">Open DiffCode.pkg and follow the installer. macOS 14 Sonoma or later, Apple Silicon.<br>
       <a href="https://github.com/ihou/DiffCode/releases/latest">Release notes</a> · <a href="https://github.com/ihou/DiffCode#build-from-source">Build from source</a> · <a href="https://github.com/ihou/DiffCode/releases">All versions</a></p>

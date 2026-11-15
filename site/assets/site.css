@@ -58,6 +58,7 @@ a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-ra
 .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 26px; border-radius: 980px; background: var(--blue); color: #fff; font-size: 17px; font-weight: 500; line-height: 1.2; }
 .btn:hover { background: var(--blue-hover); text-decoration: none; }
 .btn svg { width: 18px; height: 18px; }
+.btn-size { margin-left: 4px; padding-left: 12px; border-left: 1px solid rgba(255, 255, 255, 0.4); font-size: 0.82em; font-weight: 400; opacity: 0.85; white-space: nowrap; }
 .more { font-size: 17px; }
 .more::after { content: " ›"; }
 
@@ -80,6 +81,21 @@ a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-ra
 .head h2 { margin: 0 auto; max-width: 16em; font-size: clamp(32px, 4.4vw, 54px); line-height: 1.1; font-weight: 700; letter-spacing: -0.016em; }
 .head p { margin: 24px auto 0; max-width: 36em; font-size: clamp(18px, 1.7vw, 21px); line-height: 1.6; color: var(--muted); }
 .label { display: block; margin-bottom: 10px; font-size: 14px; font-weight: 600; color: var(--faint); }
+
+/* Size: the installer is tiny, so say it big */
+.size { text-align: center; }
+.size-label { font-size: clamp(17px, 1.6vw, 21px); font-weight: 600; color: var(--faint); }
+.size-num { margin-top: 4px; font-size: clamp(120px, 22vw, 260px); line-height: 0.95; font-weight: 700; letter-spacing: -0.05em; color: var(--ink); }
+.size-num small { margin-left: 0.06em; font-size: 0.3em; letter-spacing: -0.01em; color: var(--faint); }
+.size h2 { margin-top: 18px; font-size: clamp(32px, 4.4vw, 54px); line-height: 1.1; letter-spacing: -0.016em; }
+.size-text { margin: 22px auto 0; max-width: 34em; font-size: clamp(18px, 1.7vw, 21px); line-height: 1.6; color: var(--muted); }
+.weigh { display: grid; gap: 16px; max-width: 760px; margin: 56px auto 0; text-align: left; }
+.weigh-row { display: grid; grid-template-columns: 120px 1fr 84px; align-items: center; gap: 18px; font-size: 15px; color: var(--muted); }
+.weigh-bar { height: 14px; }
+.weigh-bar i { display: block; width: 100%; height: 100%; border-radius: 7px; background: var(--line); }
+.weigh-row.us .weigh-bar i { width: 0.4%; min-width: 8px; background: var(--blue); }
+.weigh-row.us { color: var(--ink); font-weight: 600; }
+.weigh-val { text-align: right; font-weight: 600; color: var(--ink); white-space: nowrap; }
 
 /* Why */
 .stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 36px 64px; margin-top: 72px; text-align: center; }
@@ -186,6 +202,7 @@ footer nav a { color: #424245; }
   .tile.span { padding-bottom: 30px; }
   .ledger > div, .card { padding: 28px 24px; }
   .facts li + li::before { margin: 0 6px; }
+  .weigh-row { grid-template-columns: 84px 1fr 72px; gap: 12px; font-size: 14px; }
   .mock { font-size: 12px; }
   footer nav { margin-left: 0; }
 }
