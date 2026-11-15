@@ -20,7 +20,7 @@
 3. `DRY_RUN=1 ./upgrade_macos.sh` 先看一遍签名和 appcast；没问题再 `./upgrade_macos.sh`。
 4. 首次下载的用户用 `DiffCode-<版本>.pkg`（或 `DiffCode.app.zip`）；装好后的版本会自己从 appcast 更新。
 
-线上 appcast：<https://r2-public.nanshanbei.com/diffcode/macos/stable/appcast.xml>（0.1.0 (1) 于 2026-11-13 发布；当前是 0.2.0 (2)，2026-11-14 发布，更新说明见 `release-notes/0.2.0.html`）。
+线上 appcast：<https://r2-public.nanshanbei.com/diffcode/macos/stable/appcast.xml>（0.1.0 (1) 于 2026-11-13 发布；0.2.0 (2) 于 2026-11-14 发布；当前是 0.3.0 (3)，2026-11-14 发布，更新说明见 `release-notes/0.3.0.html`；GitHub Release 上传同一份 zip 和 pkg，固定文件名 `DiffCode.zip` / `DiffCode.pkg`）。
 
 ## 脚本会拦下的问题
 

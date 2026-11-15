@@ -71,7 +71,19 @@ AI 写的代码越来越多，同事也在不停地推提交，每天花在看 d
 
 ## 安装
 
-带自动更新的公证版本会随 0.3.0 发布。在那之前请从源码构建，大约几分钟：
+**[下载 DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.zip)**（经过 Apple 签名和公证，会自动更新），解压后把 DiffCode 拖进「应用程序」。也可以用[安装包](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg)。官网：[ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/zh/)。
+
+需要 macOS 14 Sonoma 及以上、Apple Silicon 的 Mac（Intel 未测试）。想在终端里打开仓库，先链接一次 `dif` 命令：
+
+```bash
+sudo ln -sf /Applications/DiffCode.app/Contents/Resources/dif /usr/local/bin/dif
+dif                     # 打开当前目录所在的仓库
+dif ~/work/app ~/work/lib
+```
+
+### 从源码构建
+
+大约几分钟：
 
 ```bash
 git clone https://github.com/ihou/DiffCode.git
@@ -81,16 +93,10 @@ Scripts/build-app.sh --install   # 构建 DiffCode.app，复制到 /Applications
 
 需要：
 
-- macOS 14 Sonoma 及以上，Apple Silicon 的 Mac（Intel 未测试）。
 - Swift 工具链：Xcode，或者只装命令行工具（`xcode-select --install`）。已在 Swift 6.4 上测试。
 - `git`（命令行工具里自带）。
 
 源码构建的应用只给本机签名（ad-hoc），不检查更新。`/usr/local/bin` 不可写时，脚本会打印链接 `dif` 命令要用的 `sudo ln` 命令。
-
-```bash
-dif                     # 打开当前目录所在的仓库
-dif ~/work/app ~/work/lib
-```
 
 ## 隐私与安全
 

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiffCode — 像 IDE 一样好用的 Git diff，不用打开 IDE</title>
+<meta name="description" content="一个轻量的原生 Mac 应用：看清改了什么——你自己的、同事的，或者 coding agent 的——只提交你想提交的。平时只占 30–50 MB 内存，免费开源。">
+<meta name="theme-color" content="#07080a">
+<link rel="canonical" href="https://ihou.github.io/DiffCode/zh/">
+<link rel="alternate" hreflang="en" href="https://ihou.github.io/DiffCode/">
+<link rel="alternate" hreflang="zh-Hans" href="https://ihou.github.io/DiffCode/zh/">
+<link rel="alternate" hreflang="x-default" href="https://ihou.github.io/DiffCode/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DiffCode">
+<meta property="og:title" content="DiffCode — 像 IDE 一样好用的 Git diff，不用打开 IDE">
+<meta property="og:description" content="看清每一处改动，只提交你想提交的。原生 Mac 应用，平时只占 30–50 MB 内存，免费开源。">
+<meta property="og:url" content="https://ihou.github.io/DiffCode/zh/">
+<meta property="og:image" content="https://ihou.github.io/DiffCode/images/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="../images/icon.png">
+<link rel="apple-touch-icon" href="../images/icon.png">
+<link rel="stylesheet" href="../assets/site.css">
+<script>document.documentElement.classList.add("js");</script>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="../images/icon.png" alt="" width="28" height="28">DiffCode</a>
+    <nav class="nav-links" aria-label="主导航">
+      <a href="#why">为什么</a>
+      <a href="#features">功能</a>
+      <a href="https://github.com/ihou/DiffCode">GitHub</a>
+      <a class="lang" href="../" data-lang="en" hreflang="en" lang="en">English</a>
+      <a class="btn btn-primary btn-small" href="#download">下载</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow reveal"><i class="dot"></i>免费开源 · macOS 原生应用</span>
+    <h1 class="reveal">像 IDE 一样好用的 <span class="nw">Git diff，</span><br><span class="grad">不用打开 IDE。</span></h1>
+    <p class="lede reveal">看清改了什么——你自己的、同事的，或者 coding agent 的——只提交你想提交的。原生 Mac 应用，平时只占 <strong>30–50 MB</strong> 内存。</p>
+    <div class="cta reveal">
+      <a class="btn btn-primary" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.zip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        下载 Mac 版
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/ihou/DiffCode">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.74.5 12.04c0 5.1 3.29 9.42 7.86 10.95.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.34-1.28-1.7-1.28-1.7-1.04-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.4-5.26 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.55 11.55 0 0 0 23.5 12.04C23.5 5.74 18.27.5 12 .5Z"/></svg>
+        在 GitHub 上查看
+      </a>
+    </div>
+    <p class="meta reveal"><span>版本 <b data-version>0.3.0</b></span><span>macOS 14 及以上</span><span>Apple Silicon</span><span>自动更新</span></p>
+    <div class="shot reveal">
+      <div class="window"><img src="../images/chinese.png" width="2000" height="1250" alt="DiffCode 的并排 diff：一个 Kotlin 文件，其中一行不参与这次提交"></div>
+    </div>
+  </div>
+</section>
+<div class="hero-fade"></div>
+
+<section class="why" id="why">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">为什么做 DiffCode</span>
+      <h2>IDE 也能把改动看得很清楚。<span style="color: var(--muted)">只是它把别的也全带上了。</span></h2>
+      <p>为了看一眼改了什么，代码补全、编译、索引和一堆插件也跟着启动：打开要等，还要占掉几个 GB 内存。AI 和同事写的代码越来越多，这件事你一天要做很多遍。DiffCode 只留下你真正要用的那部分。</p>
+    </div>
+    <div class="ledger">
+      <div class="ledger-col ledger-out reveal">
+        <h3>去掉的</h3>
+        <ul>
+          <li><i>✕</i>代码补全</li>
+          <li><i>✕</i>编译和构建</li>
+          <li><i>✕</i>索引</li>
+          <li><i>✕</i>插件</li>
+          <li><i>✕</i>调试器</li>
+        </ul>
+      </div>
+      <div class="ledger-col ledger-in reveal">
+        <h3>留下的</h3>
+        <ul>
+          <li><i>✓</i>能直接改的并排 diff</li>
+          <li><i>✓</i>精确到行的提交</li>
+          <li><i>✓</i>Git 树和提交历史</li>
+          <li><i>✓</i>给 agent 用的终端</li>
+          <li><i>✓</i>跨所有仓库的搜索</li>
+        </ul>
+      </div>
+    </div>
+    <div class="stats reveal">
+      <div class="stat"><b class="grad">30–50 MB</b><span>日常使用的内存</span></div>
+      <div class="stat"><b>40 ms</b><span>打开 3 万行、800 多处改动的 diff</span></div>
+      <div class="stat"><b data-size>4.1 MB</b><span>下载大小，原生 AppKit</span></div>
+      <div class="stat"><b>0</b><span>你动手之前，对仓库的写入</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <div class="wrap">
+    <div class="section-head center reveal">
+      <span class="eyebrow">功能</span>
+      <h2>看改动需要的都在，不需要的都不在。</h2>
+    </div>
+
+    <div class="feature">
+      <div class="feature-text reveal">
+        <span class="eyebrow">精确提交</span>
+        <h3>只提交你想提交的。</h3>
+        <p>取消勾选某一处改动，或者选中几行不提交，这次只提交其余部分；没提交的留在工作区，下次再说。</p>
+        <ul>
+          <li>修改上次提交（Amend）、撤销刚才的提交，<kbd>⌥⌘K</kbd> 提交并推送。</li>
+          <li>Git 钩子照常运行，失败时显示原始输出。</li>
+          <li>回滚整个文件或单处改动，<kbd>⌘Z</kbd> 就能找回。</li>
+        </ul>
+      </div>
+      <div class="mock reveal" role="img" aria-label="一段 diff：四行新增，三行勾选提交，一行调试输出不提交">
+        <div class="mock-head"><b>NotesViewModel.kt</b><span>app/src/main/…/notes/ui</span><span class="num"><span class="plus">+29</span><span class="minus">−12</span></span></div>
+        <div class="mock-body">
+          <div class="ml"><span class="n">40</span><span></span><span>    <span class="k">fun</span> <span class="f">onQueryChange</span>(text: String) {</span></div>
+          <div class="ml add"><span class="n">41</span><span class="t"></span><span>        query.value = text</span></div>
+          <div class="ml out"><span class="n">42</span><span class="t"></span><span>        println(<span class="s">"debug: $text"</span>)<span class="tag">这行不提交</span></span></div>
+          <div class="ml add"><span class="n">43</span><span class="t"></span><span>        search.debounce(<span class="f">150</span>)</span></div>
+          <div class="ml add"><span class="n">44</span><span class="t"></span><span>            .collect { results = it }</span></div>
+          <div class="ml"><span class="n">45</span><span></span><span>    }</span></div>
+        </div>
+        <div class="mock-foot"><span>提交 4 / 4 个文件 · 1 个部分提交</span><span class="commit">提交 ⌘↩</span></div>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="feature-text reveal">
+        <span class="eyebrow">为 coding agent 设计</span>
+        <h3>看着 agent 干活。</h3>
+        <p>在内置终端里跑 Claude Code、Codex 或任何命令行 agent，它改的每个文件都实时出现在上方的 diff 里。</p>
+        <ul>
+          <li>哪行不对直接改，不要的回滚，满意的才提交。</li>
+          <li><kbd>⌥⌘T</kbd> 把当前文件路径和选中的行号输入终端，直接指给 agent 看。</li>
+          <li>「与分支比较」一次看完 agent 自分叉以来的全部改动。</li>
+        </ul>
+      </div>
+      <div class="window reveal"><img src="../images/terminal.png" width="2000" height="1250" loading="lazy" alt="内置终端运行脚本，上方的 diff 随之更新"></div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-text reveal">
+        <span class="eyebrow">分支和历史</span>
+        <h3>分支和历史，点一下就在。</h3>
+        <p>点分支名打开 Git 树：左边分支、标签、远程，右边提交图，用下拉框展示，不额外占一栏。</p>
+        <ul>
+          <li>检出、合并、变基、重命名、删除分支；获取、拉取、推送。</li>
+          <li>在任意提交上拣选、还原、重置，做完都能撤销。</li>
+          <li>逐行追溯（Blame）、文件历史、选中几行的历史。</li>
+        </ul>
+      </div>
+      <div class="window reveal"><img src="../images/git-graph.png" width="2000" height="1250" loading="lazy" alt="Git 树下拉框：分支、标签和提交图"></div>
+    </div>
+
+    <div class="feature flip">
+      <div class="feature-text reveal">
+        <span class="eyebrow">合并冲突</span>
+        <h3>冲突一处一处地解决。</h3>
+        <p>每处冲突上都有「保留 HEAD」「采用传入」「两者都要」。横幅一直显示合并或变基的进度，可以继续、跳过或中止。</p>
+      </div>
+      <div class="window reveal"><img src="../images/merge-conflict.png" width="2000" height="1250" loading="lazy" alt="合并冲突：保留 HEAD、采用传入、两者都要"></div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-text reveal">
+        <span class="eyebrow">所有仓库</span>
+        <h3>所有仓库，一个窗口。</h3>
+        <p>侧边栏列出所有项目，带分支、领先 / 落后数和变更数。把文件夹拖进来，或者运行 <kbd>dif ~/work/app</kbd>。</p>
+        <ul>
+          <li><kbd>⇧⇧</kbd> 随处搜索。</li>
+          <li>查找文件支持驼峰模糊匹配：<code>cvm</code> 找到 CartViewModel.kt。</li>
+          <li>基于 <code>git grep</code> 的在文件中查找，可以跨所有项目。</li>
+        </ul>
+      </div>
+      <div class="window reveal"><img src="../images/find-in-files.png" width="2000" height="1250" loading="lazy" alt="在文件中查找：结果列表和预览"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card reveal"><div class="bar"></div><h3>直接改</h3><p>工作区那一侧可以直接打字，停手约 1 秒自动保存，编码和换行符逐字节保持原样。</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>并排或单栏</h3><p>词级高亮、曲线连接带、变更总览条，<kbd>⌥⌘V</kbd> 切换视图。</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>常用语言都有高亮</h3><p>Kotlin、Java、Swift、TypeScript、Python、Go、Rust、C/C++、C#、Dart 等，还能对比图片。</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>Stash</h3><p>暂存本地改动，在列表里应用、弹出或删除，删除也能撤销。</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>深色或浅色</h3><p>深色、浅色或跟随系统；代码、界面、终端字号分别可调。</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>中文或 English</h3><p>跟随系统，或在设置里选择界面语言。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="keys">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">键盘</span>
+      <h2>手不用离开键盘。</h2>
+      <p>所有操作都有快捷键，应用里按 <kbd>⌘/</kbd> 查看全部。</p>
+    </div>
+    <div class="keymap">
+      <div class="key reveal"><div class="combo"><kbd>F7</kbd></div><span>下一处改动，到底进入下一个文件</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌘</kbd><kbd>↩</kbd></div><span>提交</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>K</kbd></div><span>提交并推送</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⇧</kbd><kbd>⇧</kbd></div><span>随处搜索</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>F</kbd></div><span>在文件中查找</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>Z</kbd></div><span>回滚文件或单处改动</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>B</kbd></div><span>Git 树</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd></div><span>把文件路径交给 agent</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="trust">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">隐私与安全</span>
+      <h2>你的代码只属于你。</h2>
+    </div>
+    <div class="grid">
+      <div class="card reveal"><div class="bar"></div><h3>没有账号，没有遥测</h3><p>只有你获取、拉取、推送时（通过你自己的 git、凭据和 SSH agent），以及检查更新时才会联网。</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>你不动手，它不写入</h3><p>刷新、diff、搜索都不写仓库，也不占 <code>index.lock</code>，可以和 IDE、agent 同时开着。</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>做了都能撤销</h3><p>回滚、删除、改写历史都能撤销；删除的文件进废纸篓，危险操作先确认。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="download" id="download">
+  <div class="wrap">
+    <img class="app-icon reveal" src="../images/icon.png" width="132" height="132" alt="DiffCode 图标">
+    <h2 class="reveal">下载 DiffCode。</h2>
+    <p class="lede reveal">免费开源。经过 Apple 签名和公证，装好后会自动更新。</p>
+    <div class="cta reveal">
+      <a class="btn btn-primary" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.zip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        <span>下载 DiffCode <span data-version>0.3.0</span></span>
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg">安装包（.pkg）</a>
+    </div>
+    <p class="small reveal">解压后把 DiffCode 拖进「应用程序」，以后的更新会在应用里提示。<br>
+      <a href="https://github.com/ihou/DiffCode/releases/latest">更新说明</a> · <a href="https://github.com/ihou/DiffCode/blob/main/README.zh-CN.md#从源码构建">从源码构建</a> · <a href="https://github.com/ihou/DiffCode/releases">所有版本</a></p>
+    <div class="req reveal"><span>macOS 14 Sonoma 及以上</span><span>Apple Silicon</span><span>GPLv3</span></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="./"><img src="../images/icon.png" alt="" width="22" height="22">DiffCode</a>
+    <nav aria-label="页脚">
+      <a href="https://github.com/ihou/DiffCode">源码</a>
+      <a href="https://github.com/ihou/DiffCode/issues">反馈问题</a>
+      <a href="https://github.com/ihou/DiffCode/discussions">讨论区</a>
+      <a href="https://github.com/ihou/DiffCode/blob/main/SECURITY.md">安全</a>
+      <a href="../" data-lang="en" hreflang="en" lang="en">English</a>
+    </nav>
+    <p class="fine">DiffCode 是自由软件，采用 GNU 通用公共许可证 v3.0。© 2026 the DiffCode authors。截图里的仓库都是为演示虚构的。</p>
+  </div>
+</footer>
+
+<script src="../assets/site.js" defer></script>
+</body>
+</html>

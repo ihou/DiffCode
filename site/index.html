@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiffCode — An IDE-grade Git diff, without the IDE</title>
+<meta name="description" content="A lightweight native Mac app for reviewing what changed — yours, your teammates' or your coding agent's — and committing exactly what you mean. About 30–50 MB of memory. Free and open source.">
+<meta name="theme-color" content="#07080a">
+<link rel="canonical" href="https://ihou.github.io/DiffCode/">
+<link rel="alternate" hreflang="en" href="https://ihou.github.io/DiffCode/">
+<link rel="alternate" hreflang="zh-Hans" href="https://ihou.github.io/DiffCode/zh/">
+<link rel="alternate" hreflang="x-default" href="https://ihou.github.io/DiffCode/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DiffCode">
+<meta property="og:title" content="DiffCode — An IDE-grade Git diff, without the IDE">
+<meta property="og:description" content="Review every change and commit exactly what you mean, in a native Mac app that uses about 30–50 MB of memory. Free and open source.">
+<meta property="og:url" content="https://ihou.github.io/DiffCode/">
+<meta property="og:image" content="https://ihou.github.io/DiffCode/images/social-preview.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="images/icon.png">
+<link rel="apple-touch-icon" href="images/icon.png">
+<link rel="stylesheet" href="assets/site.css">
+<script>
+  document.documentElement.classList.add("js");
+  try {
+    var chosen = localStorage.getItem("diffcode-lang");
+    var first = (navigator.languages && navigator.languages[0]) || navigator.language || "";
+    if (!chosen && /^zh/i.test(first)) location.replace("zh/");
+  } catch (e) {}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="images/icon.png" alt="" width="28" height="28">DiffCode</a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#why">Why</a>
+      <a href="#features">Features</a>
+      <a href="https://github.com/ihou/DiffCode">GitHub</a>
+      <a class="lang" href="zh/" data-lang="zh" hreflang="zh-Hans" lang="zh-Hans">中文</a>
+      <a class="btn btn-primary btn-small" href="#download">Download</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <span class="eyebrow reveal"><i class="dot"></i>Free and open source · for macOS</span>
+    <h1 class="reveal">An IDE-grade Git diff, <span class="grad">without the IDE.</span></h1>
+    <p class="lede reveal">Review what changed — yours, your teammates' or your coding agent's — and commit exactly what you mean. A native Mac app that uses about <strong>30–50 MB</strong> of memory.</p>
+    <div class="cta reveal">
+      <a class="btn btn-primary" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.zip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download for Mac
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/ihou/DiffCode">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.74.5 12.04c0 5.1 3.29 9.42 7.86 10.95.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.37-3.87-1.37-.52-1.34-1.28-1.7-1.28-1.7-1.04-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.4-5.26 5.69.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.55 11.55 0 0 0 23.5 12.04C23.5 5.74 18.27.5 12 .5Z"/></svg>
+        View on GitHub
+      </a>
+    </div>
+    <p class="meta reveal"><span>Version <b data-version>0.3.0</b></span><span>macOS 14 or later</span><span>Apple Silicon</span><span>Updates itself</span></p>
+    <div class="shot reveal">
+      <div class="window"><img src="images/hero.png" width="2000" height="1250" alt="DiffCode showing a side-by-side diff of a Kotlin file, with one line left out of the commit"></div>
+    </div>
+  </div>
+</section>
+<div class="hero-fade"></div>
+
+<section class="why" id="why">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Why DiffCode</span>
+      <h2>Your IDE already shows diffs well. <span style="color: var(--muted)">It just brings everything else along.</span></h2>
+      <p>Opening it to see what changed also starts code completion, builds, indexing and a pile of plugins: a long wait and several gigabytes of memory. With agents and teammates writing more of the code, you do that all day. DiffCode keeps only the part you came for.</p>
+    </div>
+    <div class="ledger">
+      <div class="ledger-col ledger-out reveal">
+        <h3>Left out</h3>
+        <ul>
+          <li><i>✕</i>Code completion</li>
+          <li><i>✕</i>Compiler and builds</li>
+          <li><i>✕</i>Indexing</li>
+          <li><i>✕</i>Plugins</li>
+          <li><i>✕</i>Debugger</li>
+        </ul>
+      </div>
+      <div class="ledger-col ledger-in reveal">
+        <h3>Kept</h3>
+        <ul>
+          <li><i>✓</i>A side-by-side diff you can edit</li>
+          <li><i>✓</i>Commits down to single lines</li>
+          <li><i>✓</i>Git history and graph</li>
+          <li><i>✓</i>A terminal for your agents</li>
+          <li><i>✓</i>Search across every repository</li>
+        </ul>
+      </div>
+    </div>
+    <div class="stats reveal">
+      <div class="stat"><b class="grad">30–50 MB</b><span>of memory in everyday use</span></div>
+      <div class="stat"><b>40 ms</b><span>to open a 30,000-line diff with 800 changes</span></div>
+      <div class="stat"><b data-size>4.1 MB</b><span>download, native AppKit</span></div>
+      <div class="stat"><b>0</b><span>writes to your repository until you act</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="features" id="features">
+  <div class="wrap">
+    <div class="section-head center reveal">
+      <span class="eyebrow">Features</span>
+      <h2>Everything a review needs. Nothing it doesn't.</h2>
+    </div>
+
+    <div class="feature">
+      <div class="feature-text reveal">
+        <span class="eyebrow">Precise commits</span>
+        <h3>Commit exactly what you mean.</h3>
+        <p>Untick a hunk, or select lines and leave them out. Only the rest is committed; what you left out stays in your working tree for later.</p>
+        <ul>
+          <li>Amend, undo the last commit, or commit and push with <kbd>⌥⌘K</kbd>.</li>
+          <li>Git hooks run as usual, and their output is shown when they fail.</li>
+          <li>Roll back a file or a single change. <kbd>⌘Z</kbd> brings it back.</li>
+        </ul>
+      </div>
+      <div class="mock reveal" role="img" aria-label="A diff with four added lines; three are ticked for the commit and a debug print is left out">
+        <div class="mock-head"><b>NotesViewModel.kt</b><span>app/src/main/…/notes/ui</span><span class="num"><span class="plus">+29</span><span class="minus">−12</span></span></div>
+        <div class="mock-body">
+          <div class="ml"><span class="n">40</span><span></span><span>    <span class="k">fun</span> <span class="f">onQueryChange</span>(text: String) {</span></div>
+          <div class="ml add"><span class="n">41</span><span class="t"></span><span>        query.value = text</span></div>
+          <div class="ml out"><span class="n">42</span><span class="t"></span><span>        println(<span class="s">"debug: $text"</span>)<span class="tag">left out of this commit</span></span></div>
+          <div class="ml add"><span class="n">43</span><span class="t"></span><span>        search.debounce(<span class="f">150</span>)</span></div>
+          <div class="ml add"><span class="n">44</span><span class="t"></span><span>            .collect { results = it }</span></div>
+          <div class="ml"><span class="n">45</span><span></span><span>    }</span></div>
+        </div>
+        <div class="mock-foot"><span>4 of 4 files to commit · 1 in part</span><span class="commit">Commit ⌘↩</span></div>
+      </div>
+    </div>
+
+    <div class="feature flip">
+      <div class="feature-text reveal">
+        <span class="eyebrow">Made for coding agents</span>
+        <h3>Watch your agent work.</h3>
+        <p>Run Claude Code, Codex or any command-line agent in the built-in terminal. Every file it touches shows up in the diff above as it works.</p>
+        <ul>
+          <li>Fix a line in place, roll back what you don't want, commit what you approve.</li>
+          <li><kbd>⌥⌘T</kbd> types the current file and selected lines into the terminal.</li>
+          <li>Compare with Branch shows everything since the agent branched off.</li>
+        </ul>
+      </div>
+      <div class="window reveal"><img src="images/terminal.png" width="2000" height="1250" loading="lazy" alt="The built-in terminal running a script while the diff above updates"></div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-text reveal">
+        <span class="eyebrow">History</span>
+        <h3>Branches and history, one click away.</h3>
+        <p>Click a branch name for the Git graph in a dropdown — branches, tags and remotes on the left, commits on the right — without giving up a column.</p>
+        <ul>
+          <li>Check out, merge, rebase, rename and delete branches; fetch, pull and push.</li>
+          <li>Cherry-pick, revert or reset any commit, each with Undo.</li>
+          <li>Blame, file history and the history of a few selected lines.</li>
+        </ul>
+      </div>
+      <div class="window reveal"><img src="images/git-graph.png" width="2000" height="1250" loading="lazy" alt="The Git graph dropdown with branches, tags and the commit graph"></div>
+    </div>
+
+    <div class="feature flip">
+      <div class="feature-text reveal">
+        <span class="eyebrow">Merge conflicts</span>
+        <h3>Conflicts, one choice at a time.</h3>
+        <p>Every conflict gets Keep HEAD, Take Incoming and Keep Both. A banner keeps the merge or rebase in view, with Continue, Skip and Abort.</p>
+      </div>
+      <div class="window reveal"><img src="images/merge-conflict.png" width="2000" height="1250" loading="lazy" alt="A merge conflict with Keep HEAD, Take Incoming and Keep Both"></div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-text reveal">
+        <span class="eyebrow">All your repositories</span>
+        <h3>Every repository, one window.</h3>
+        <p>The sidebar lists your projects with branch, ahead and behind, and change counts. Drag folders in, or run <kbd>dif ~/work/app</kbd>.</p>
+        <ul>
+          <li>Search Everywhere with <kbd>⇧⇧</kbd>.</li>
+          <li>Go to File with camel-case matching: <code>cvm</code> finds CartViewModel.kt.</li>
+          <li>Find in Files across all projects, powered by <code>git grep</code>.</li>
+        </ul>
+      </div>
+      <div class="window reveal"><img src="images/find-in-files.png" width="2000" height="1250" loading="lazy" alt="Find in Files with a result list and preview"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card reveal"><div class="bar"></div><h3>Edit in place</h3><p>Type into the working-tree side. It saves after a second of idle and keeps encoding and line endings byte for byte.</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>Side-by-side or unified</h3><p>Word-level highlights, curved connectors and an overview bar. <kbd>⌥⌘V</kbd> switches views.</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>Syntax for your stack</h3><p>Kotlin, Java, Swift, TypeScript, Python, Go, Rust, C/C++, C#, Dart and more. Image diffs too.</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>Stash</h3><p>Stash local changes, then apply, pop or drop them from a list. Dropping can be undone.</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>Light or dark</h3><p>Dark, light or follow the system. Separate font sizes for code, interface and terminal.</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>English or 中文</h3><p>Follows your Mac, or pick a language in Settings.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="keys">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Keyboard</span>
+      <h2>Your hands stay on the keys.</h2>
+      <p>Everything has a shortcut. Press <kbd>⌘/</kbd> in the app to see them all.</p>
+    </div>
+    <div class="keymap">
+      <div class="key reveal"><div class="combo"><kbd>F7</kbd></div><span>Next change, then the next file</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌘</kbd><kbd>↩</kbd></div><span>Commit</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>K</kbd></div><span>Commit and push</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⇧</kbd><kbd>⇧</kbd></div><span>Search everywhere</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⇧</kbd><kbd>⌘</kbd><kbd>F</kbd></div><span>Find in files</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>Z</kbd></div><span>Roll back a file or change</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>B</kbd></div><span>Git graph</span></div>
+      <div class="key reveal"><div class="combo"><kbd>⌥</kbd><kbd>⌘</kbd><kbd>T</kbd></div><span>Hand the file path to your agent</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="trust">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="eyebrow">Privacy and safety</span>
+      <h2>Your code stays yours.</h2>
+    </div>
+    <div class="grid">
+      <div class="card reveal"><div class="bar"></div><h3>No account, no telemetry</h3><p>DiffCode goes online only when you fetch, pull or push — through your own git, credentials and SSH agent — and to check for updates.</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>Read-only until you act</h3><p>Refreshing, diffing and searching never write to your repository or take <code>index.lock</code>, so it can stay open next to your IDE and agents.</p></div>
+      <div class="card reveal"><div class="bar"></div><h3>Everything can be undone</h3><p>Rollbacks, deletes and history edits come with Undo. Deleted files go to the Trash, and risky steps ask first.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="download" id="download">
+  <div class="wrap">
+    <img class="app-icon reveal" src="images/icon.png" width="132" height="132" alt="DiffCode icon">
+    <h2 class="reveal">Get DiffCode.</h2>
+    <p class="lede reveal">Free and open source. Signed and notarized by Apple, and it keeps itself up to date.</p>
+    <div class="cta reveal">
+      <a class="btn btn-primary" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.zip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        <span>Download DiffCode <span data-version>0.3.0</span></span>
+      </a>
+      <a class="btn btn-ghost" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg">Installer (.pkg)</a>
+    </div>
+    <p class="small reveal">Unzip and drag DiffCode to Applications. Updates arrive in the app.<br>
+      <a href="https://github.com/ihou/DiffCode/releases/latest">Release notes</a> · <a href="https://github.com/ihou/DiffCode#build-from-source">Build from source</a> · <a href="https://github.com/ihou/DiffCode/releases">All versions</a></p>
+    <div class="req reveal"><span>macOS 14 Sonoma or later</span><span>Apple Silicon</span><span>GPLv3</span></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="./"><img src="images/icon.png" alt="" width="22" height="22">DiffCode</a>
+    <nav aria-label="Footer">
+      <a href="https://github.com/ihou/DiffCode">Source code</a>
+      <a href="https://github.com/ihou/DiffCode/issues">Report an issue</a>
+      <a href="https://github.com/ihou/DiffCode/discussions">Discussions</a>
+      <a href="https://github.com/ihou/DiffCode/blob/main/SECURITY.md">Security</a>
+      <a href="zh/" data-lang="zh" hreflang="zh-Hans" lang="zh-Hans">简体中文</a>
+    </nav>
+    <p class="fine">DiffCode is free software under the GNU General Public License v3.0. © 2026 the DiffCode authors. The screenshots show fictional repositories.</p>
+  </div>
+</footer>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>

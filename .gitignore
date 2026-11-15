@@ -25,3 +25,6 @@ release/appstore/*.p8
 *.provisionprofile
 *.local.env
 .env
+
+# Website: the screenshots are copied in from docs/images when the site is deployed
+/site/images/

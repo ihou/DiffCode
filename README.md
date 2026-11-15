@@ -71,7 +71,19 @@ The repositories in the screenshots are made up for the purpose.
 
 ## Install
 
-Notarized downloads with automatic updates are coming with version 0.3.0. Until then, build DiffCode from source — it takes a couple of minutes:
+**[Download DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.zip)** (signed and notarized by Apple, updates itself), unzip it and drag DiffCode to Applications. There is also an [installer package](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg), and the website is at [ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/).
+
+It needs macOS 14 Sonoma or later on an Apple Silicon Mac (Intel Macs are untested). To open repositories from the terminal, link the `dif` command once:
+
+```bash
+sudo ln -sf /Applications/DiffCode.app/Contents/Resources/dif /usr/local/bin/dif
+dif                     # open the repository you are in
+dif ~/work/app ~/work/lib
+```
+
+### Build from source
+
+It takes a couple of minutes:
 
 ```bash
 git clone https://github.com/ihou/DiffCode.git
@@ -81,16 +93,10 @@ Scripts/build-app.sh --install   # builds DiffCode.app, copies it to /Applicatio
 
 You need:
 
-- macOS 14 Sonoma or later on an Apple Silicon Mac (Intel Macs are untested).
 - A Swift toolchain: Xcode, or just the Command Line Tools (`xcode-select --install`). Tested with Swift 6.4.
 - `git`, which the Command Line Tools include.
 
 Builds from source are signed for your Mac only (ad hoc) and do not check for updates. If `/usr/local/bin` is not writable, the script prints the `sudo ln` command for the `dif` command instead.
-
-```bash
-dif                     # open the repository you are in
-dif ~/work/app ~/work/lib
-```
 
 ## Keyboard shortcuts
 
