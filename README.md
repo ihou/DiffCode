@@ -17,6 +17,7 @@
 </p>
 
 <p align="center">
+  <a href="https://ihou.github.io/DiffCode/"><b>Website</b></a> · <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>Download (4 MB)</b></a><br>
   English · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
