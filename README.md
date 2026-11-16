@@ -6,18 +6,19 @@
 
 <p align="center">
   <b>An IDE-grade Git diff, without the IDE.</b><br>
-  A lightweight native Mac app for reviewing what changed — yours, your teammates' or your coding agent's — and committing exactly what you mean.
+  A lightweight native app for Mac and Windows for reviewing what changed — yours, your teammates' or your coding agent's — and committing exactly what you mean.
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue.svg"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-lightgrey.svg">
-  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-native-lightgrey.svg">
+  <img alt="Windows 10 or later" src="https://img.shields.io/badge/Windows-10%2B-lightgrey.svg">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-AppKit-orange.svg">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-Win32-orange.svg">
 </p>
 
 <p align="center">
-  <a href="https://ihou.github.io/DiffCode/"><b>Website</b></a> · <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>Download (4 MB)</b></a><br>
+  <a href="https://ihou.github.io/DiffCode/"><b>Website</b></a> · Download for <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>Mac</b></a> or <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe"><b>Windows</b></a> (4 MB)<br>
   English · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
@@ -72,6 +73,8 @@ The repositories in the screenshots are made up for the purpose.
 
 ## Install
 
+### Mac
+
 **[Download DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg)** (signed and notarized by Apple, updates itself) and open the installer. The website is at [ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/).
 
 It needs macOS 14 Sonoma or later on an Apple Silicon Mac (Intel Macs are untested). To open repositories from the terminal, link the `dif` command once:
@@ -81,6 +84,14 @@ sudo ln -sf /Applications/DiffCode.app/Contents/Resources/dif /usr/local/bin/dif
 dif                     # open the repository you are in
 dif ~/work/app ~/work/lib
 ```
+
+### Windows
+
+**[Download the installer](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe)** and run it. It installs for your account without administrator rights and tells you when a new version is out; prefer no installer? Unzip [`DiffCode-windows-x64.zip`](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-windows-x64.zip) and run `DiffCode.exe`. It needs 64-bit Windows 10 (1809) or Windows 11, and [Git for Windows](https://git-scm.com/download/win).
+
+The installer is not code-signed — certificates cost money every year — so the first time you run it, SmartScreen may say *Windows protected your PC*. Choose **More info → Run anyway**. Checksums are in `SHA256SUMS-windows.txt` on the [release page](https://github.com/ihou/DiffCode/releases/latest), and GitHub Actions builds every release from the tagged source.
+
+The Windows version is a native Win32 app written in Rust, in [`windows/`](windows/PORTING.md). It has the same features; shortcuts follow the IDE's Windows keymap (`Ctrl` where the Mac uses `⌘`), and `Ctrl+/` lists them all. The built-in terminal runs PowerShell or cmd.
 
 ### Build from source
 
@@ -101,7 +112,7 @@ Builds from source are signed for your Mac only (ad hoc) and do not check for up
 
 ## Keyboard shortcuts
 
-Everything has a shortcut. A few to start with:
+Everything has a shortcut. A few to start with (on the Mac; on Windows press `Ctrl+/` to see them):
 
 | Action | Shortcut | | Action | Shortcut |
 |---|---|---|---|---|
@@ -118,9 +129,9 @@ On a Mac keyboard, `F1`–`F12` need `Fn` unless you turn on *Use F1, F2, etc. k
 
 ## Privacy and safety
 
-- No account, no telemetry, no analytics. DiffCode talks to the network only when you fetch, pull or push (through your own `git`, credential helper and SSH agent) and, in the notarized download, to check for updates.
+- No account, no telemetry, no analytics. DiffCode talks to the network only when you fetch, pull or push (through your own `git`, credential helper and SSH agent) and, in the downloadable editions, to check for updates.
 - Everything that writes — editing, rolling back, committing, checking out, history changes — happens because you asked for it. Destructive steps ask first and offer *Undo*.
-- The built-in terminal runs your login shell with your own privileges, exactly like Terminal.app. Programs you start there, including coding agents, can do whatever your account can.
+- The built-in terminal runs your login shell (PowerShell or cmd on Windows) with your own privileges, exactly like Terminal.app. Programs you start there, including coding agents, can do whatever your account can.
 
 ## How it stays light
 
@@ -128,21 +139,22 @@ There is no index, no background process and no language server. Git does the he
 
 ## Not planned
 
-DiffCode is a Mac app built on AppKit; there is no Windows or Linux version. Editing is plain text in place — no code completion, multiple cursors or find-and-replace. Interactive rebase, tag management and submodules are left to `git` in the built-in terminal. DiffCode never opens an external editor.
+There is no Linux version. Editing is plain text in place — no code completion, multiple cursors or find-and-replace. Interactive rebase, tag management and submodules are left to `git` in the built-in terminal. DiffCode never opens an external editor.
 
 ## Documentation
 
 - [User guide (简体中文)](docs/GUIDE.zh-CN.md) — every feature in detail, plus measurements and the code layout.
+- [Windows port](windows/PORTING.md) — how the Windows version is built, tested and released.
 - Building the release editions: [`release/macos`](release/macos/README.md) (notarized download with Sparkle) and [`release/appstore`](release/appstore/README.md) (sandboxed Mac App Store edition, not published).
 
 ## Contributing
 
-Bug reports, ideas and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Run `swift test` before sending a change; the suite drives real temporary repositories end to end. Please report security issues privately as described in [SECURITY.md](SECURITY.md).
+Bug reports, ideas and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Run `swift test` (or `cargo test --workspace` in `windows/`) before sending a change; the suite drives real temporary repositories end to end. Please report security issues privately as described in [SECURITY.md](SECURITY.md).
 
 ## License
 
 DiffCode is free software under the [GNU General Public License v3.0](LICENSE). Copyright © 2026 the DiffCode authors.
 
-It uses [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) for the terminal and, in the downloadable edition, [Sparkle](https://sparkle-project.org) for updates, both under the MIT license; their notices ship inside the app (*About DiffCode*).
+It uses [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) for the terminal and, in the downloadable edition, [Sparkle](https://sparkle-project.org) for updates, both under the MIT license; their notices ship inside the app (*About DiffCode*). The Windows version builds on Rust crates such as [alacritty_terminal](https://github.com/alacritty/alacritty) and [windows-rs](https://github.com/microsoft/windows-rs); `THIRD-PARTY-NOTICES.txt` beside the program lists them all with their licenses.
 
 The GPL covers the code, not the DiffCode name or icon. If you distribute a modified version, please give it a different name and icon so people can tell the two apart.
