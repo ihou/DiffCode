@@ -1,0 +1,19 @@
+[package]
+name = "diffcode-ui"
+description = "DiffCode's interface: a small drawing toolkit and every view, independent of the platform."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+diffcode-core.workspace = true
+# Find in Files: checks a pattern and marks its match on each result line. The small engine keeps the installer small.
+regex-lite = "0.1"
+# The terminal: the screen, scrollback, selection and escape sequences, and the pseudo-console the shell runs on
+# (ConPTY on Windows). Apache-2.0, as SwiftTerm is MIT on the Mac.
+alacritty_terminal = { version = "0.26", default-features = false }
+
+[dev-dependencies]
+tempfile = "3"

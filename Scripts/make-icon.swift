@@ -1,6 +1,8 @@
 // Renders the app icon into an .iconset directory:  swift Scripts/make-icon.swift <out.iconset>
 // With a second argument it also writes a preview sheet (every size on light and dark):
 //   swift Scripts/make-icon.swift <out.iconset> <preview.png>
+// For Windows, the same icon with its tile filling the canvas, as Windows icons do, as an .ico:
+//   swift Scripts/make-icon.swift --windows windows/crates/app/res/DiffCode.ico
 import AppKit
 
 func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
@@ -9,6 +11,9 @@ func color(_ hex: UInt32, _ alpha: CGFloat = 1) -> CGColor {
 }
 
 let space = CGColorSpace(name: CGColorSpace.sRGB)!
+
+/// Windows icons fill their canvas; the Mac's sit on Apple's grid with room for a shadow.
+let forWindows = CommandLine.arguments.count == 3 && CommandLine.arguments[1] == "--windows"
 
 /// Draws the icon on a 1024-unit canvas (origin bottom-left).
 ///
@@ -20,12 +25,20 @@ func draw(_ ctx: CGContext, small: Bool) {
     let body = CGRect(x: 100, y: 100, width: 824, height: 824)
     let shape = CGPath(roundedRect: body, cornerWidth: 186, cornerHeight: 186, transform: nil)
 
-    ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: color(0x000000, 0.32))
-    ctx.addPath(shape)
-    ctx.setFillColor(color(0x15161A))
-    ctx.fillPath()
-    ctx.restoreGState()
+    if forWindows {
+        // The whole drawing scaled up so the tile all but fills the canvas (a 2.5% margin), and no shadow.
+        let k: CGFloat = 0.95 * 1024 / 824
+        ctx.translateBy(x: 512, y: 512)
+        ctx.scaleBy(x: k, y: k)
+        ctx.translateBy(x: -512, y: -512)
+    } else {
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 24, color: color(0x000000, 0.32))
+        ctx.addPath(shape)
+        ctx.setFillColor(color(0x15161A))
+        ctx.fillPath()
+        ctx.restoreGState()
+    }
 
     ctx.saveGState()
     ctx.addPath(shape)
@@ -96,6 +109,26 @@ func image(_ pixels: Int) -> CGImage {
 
 func write(_ image: CGImage, to url: URL) throws {
     try NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!.write(to: url)
+}
+
+if forWindows {
+    // An .ico of PNG images, one per size Windows asks for (taskbar, title bar, Explorer at every scale).
+    let sizes = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]
+    let images = sizes.map { NSBitmapImageRep(cgImage: image($0)).representation(using: .png, properties: [:])! }
+    var ico = Data()
+    func le16(_ v: Int) { ico.append(contentsOf: [UInt8(v & 0xFF), UInt8((v >> 8) & 0xFF)]) }
+    func le32(_ v: Int) { le16(v & 0xFFFF); le16((v >> 16) & 0xFFFF) }
+    le16(0); le16(1); le16(sizes.count)
+    var offset = 6 + 16 * sizes.count
+    for (size, png) in zip(sizes, images) {
+        ico.append(UInt8(size >= 256 ? 0 : size)); ico.append(UInt8(size >= 256 ? 0 : size))
+        ico.append(0); ico.append(0)
+        le16(1); le16(32); le32(png.count); le32(offset)
+        offset += png.count
+    }
+    images.forEach { ico.append($0) }
+    try ico.write(to: URL(fileURLWithPath: CommandLine.arguments[2]))
+    exit(0)
 }
 
 guard (2...3).contains(CommandLine.arguments.count) else {

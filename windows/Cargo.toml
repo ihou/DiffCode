@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/ui", "crates/app"]
+
+[workspace.package]
+version = "0.3.0"
+edition = "2021"
+license = "GPL-3.0-only"
+repository = "https://github.com/ihou/DiffCode"
+rust-version = "1.85"
+
+[workspace.dependencies]
+diffcode-core = { path = "crates/core" }
+diffcode-ui = { path = "crates/ui" }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Tests build the core with optimisations: the diff engine and lexer are exercised on big inputs.
+[profile.test]
+opt-level = 1

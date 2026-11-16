@@ -1,0 +1,53 @@
+[package]
+name = "diffcode"
+description = "DiffCode for Windows: the window, Direct2D drawing and the platform services."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "DiffCode"
+path = "src/main.rs"
+
+[build-dependencies]
+# Compiles the icon, version and manifest into the executable (rc.exe with MSVC, windres with MinGW).
+embed-resource = "3"
+
+[dependencies]
+diffcode-core.workspace = true
+diffcode-ui.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-numerics = "0.3"
+# The `implement` macro (the window as a drop target) names this crate directly.
+windows-core = "0.62"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Globalization",
+    "Win32_Graphics_Direct2D",
+    "Win32_Graphics_Direct2D_Common",
+    "Win32_Graphics_DirectWrite",
+    "Win32_Graphics_Dwm",
+    "Win32_Graphics_Dxgi_Common",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_Imaging",
+    "Win32_Security",
+    "Win32_System_Com",
+    "Win32_System_DataExchange",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Ole",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Registry",
+    "Win32_System_SystemServices",
+    "Win32_System_Threading",
+    "Win32_UI_HiDpi",
+    "Win32_UI_Input_Ime",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
+    "Win32_UI_WindowsAndMessaging",
+] }
