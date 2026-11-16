@@ -18,6 +18,8 @@ Debug builds can drive their own UI and capture their window without Screen Reco
 DIF_ACTIONS="split;select:src/Main.kt" DIF_SNAPSHOT=/tmp/out.png .build/debug/Dif /path/to/a/test/repo
 ```
 
+The Windows version is a Rust workspace in [`windows/`](windows/PORTING.md): `cargo test --workspace` there runs its tests on any platform, and [PORTING.md](windows/PORTING.md) explains how to build, screenshot and package it.
+
 Test against throwaway repositories, never against one whose history you care about.
 
 ## What a change should keep true
@@ -30,7 +32,7 @@ Test against throwaway repositories, never against one whose history you care ab
 
 ## Pull requests
 
-Keep each pull request to one change, describe what users will notice, and add a screenshot for anything visible. Run `swift test` before you send it.
+Keep each pull request to one change, describe what users will notice, and add a screenshot for anything visible. Run `swift test` (and `cargo test --workspace` in `windows/` for Windows changes) before you send it.
 
 ## Contributor License Agreement
 

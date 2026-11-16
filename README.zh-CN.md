@@ -6,18 +6,19 @@
 
 <p align="center">
   <b>像 IDE 一样好用的 Git diff，不用打开 IDE。</b><br>
-  一个轻量的原生 Mac 应用：看清改了什么——你自己的、同事的，或者 coding agent 的——只提交你想提交的。
+  一个轻量的原生应用（Mac 和 Windows）：看清改了什么——你自己的、同事的，或者 coding agent 的——只提交你想提交的。
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue.svg"></a>
   <img alt="macOS 14 及以上" src="https://img.shields.io/badge/macOS-14%2B-lightgrey.svg">
-  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-native-lightgrey.svg">
+  <img alt="Windows 10 及以上" src="https://img.shields.io/badge/Windows-10%2B-lightgrey.svg">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-AppKit-orange.svg">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-Win32-orange.svg">
 </p>
 
 <p align="center">
-  <a href="https://ihou.github.io/DiffCode/zh/"><b>官网</b></a> · <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>下载（4 MB）</b></a><br>
+  <a href="https://ihou.github.io/DiffCode/zh/"><b>官网</b></a> · 下载 <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>Mac 版</b></a> / <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe"><b>Windows 版</b></a>（4 MB）<br>
   <a href="README.md">English</a> · 简体中文
 </p>
 
@@ -55,7 +56,7 @@ AI 写的代码越来越多，同事也在不停地推提交，每天花在看 d
 
 **其他**
 - 深色 / 浅色 / 跟随系统；界面语言 跟随系统 / English / 简体中文；代码、界面、终端字号分别可调。
-- 所有操作都有快捷键，应用内按 `⌘/` 查看全部。
+- 所有操作都有快捷键，应用内按 `⌘/`（Windows 上是 `Ctrl+/`）查看全部。
 
 ## 截图
 
@@ -72,6 +73,8 @@ AI 写的代码越来越多，同事也在不停地推提交，每天花在看 d
 
 ## 安装
 
+### Mac
+
 **[下载 DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg)**（经过 Apple 签名和公证，会自动更新），打开安装包按提示安装即可。官网：[ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/zh/)。
 
 需要 macOS 14 Sonoma 及以上、Apple Silicon 的 Mac（Intel 未测试）。想在终端里打开仓库，先链接一次 `dif` 命令：
@@ -81,6 +84,14 @@ sudo ln -sf /Applications/DiffCode.app/Contents/Resources/dif /usr/local/bin/dif
 dif                     # 打开当前目录所在的仓库
 dif ~/work/app ~/work/lib
 ```
+
+### Windows
+
+**[下载安装包](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe)** 并运行。安装到当前账户，不需要管理员权限；有新版本时应用会提示。不想用安装包，也可以解压 [`DiffCode-windows-x64.zip`](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-windows-x64.zip) 直接运行 `DiffCode.exe`。需要 64 位 Windows 10（1809）或 Windows 11，以及 [Git for Windows](https://git-scm.com/download/win)。
+
+安装包没有做代码签名（证书每年都要花钱），所以第一次运行时 SmartScreen 可能提示「Windows 已保护你的电脑」，点「更多信息 → 仍要运行」即可。校验和在[发布页](https://github.com/ihou/DiffCode/releases/latest)的 `SHA256SUMS-windows.txt` 里，每个版本都由 GitHub Actions 从打了标签的源码构建。
+
+Windows 版是用 Rust 写的原生 Win32 应用，代码在 [`windows/`](windows/PORTING.md)。功能和 Mac 版一致；快捷键沿用 IDE 的 Windows 键位（Mac 上的 `⌘` 换成 `Ctrl`），按 `Ctrl+/` 查看全部。内置终端运行 PowerShell 或 cmd。
 
 ### 从源码构建
 
@@ -101,23 +112,24 @@ Scripts/build-app.sh --install   # 构建 DiffCode.app，复制到 /Applications
 
 ## 隐私与安全
 
-- 没有账号、没有遥测、没有统计。只有你获取、拉取、推送时（通过你自己的 `git`、凭据助手和 SSH agent），以及公证版检查更新时才会联网。
+- 没有账号、没有遥测、没有统计。只有你获取、拉取、推送时（通过你自己的 `git`、凭据助手和 SSH agent），以及下载版检查更新时才会联网。
 - 所有会写入的操作——编辑、回滚、提交、检出、改写历史——都由你主动触发；危险的操作先确认，做完能撤销。
-- 内置终端运行的是你的登录 shell，权限和你在 Terminal.app 里一样；在里面启动的程序（包括 coding agent）能做你的账号能做的一切。
+- 内置终端运行的是你的登录 shell（Windows 上是 PowerShell 或 cmd），权限和你在 Terminal.app 里一样；在里面启动的程序（包括 coding agent）能做你的账号能做的一切。
 
 ## 文档
 
 - [使用说明](docs/GUIDE.zh-CN.md)：每个功能的细节、全部快捷键、实测数据和代码结构。
+- [Windows 移植](windows/PORTING.md)：Windows 版怎么构建、测试和发布。
 - 发布渠道的构建：[`release/macos`](release/macos/README.md)（公证版，Sparkle 自动更新）和 [`release/appstore`](release/appstore/README.md)（沙盒化的 App Store 版，未上架）。
 
 ## 参与
 
-欢迎反馈问题、提建议和提交 PR，见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交改动前请先跑 `swift test`，测试会在真实的临时仓库上端到端运行。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
+欢迎反馈问题、提建议和提交 PR，见 [CONTRIBUTING.md](CONTRIBUTING.md)。提交改动前请先跑 `swift test`（Windows 版在 `windows/` 里跑 `cargo test --workspace`），测试会在真实的临时仓库上端到端运行。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
 
 ## 许可证
 
 DiffCode 是自由软件，采用 [GNU 通用公共许可证 v3.0](LICENSE)。Copyright © 2026 the DiffCode authors.
 
-终端用的是 [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)，下载版的自动更新用的是 [Sparkle](https://sparkle-project.org)，二者都是 MIT 许可证，许可声明随应用分发（「关于 DiffCode」）。
+终端用的是 [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm)，下载版的自动更新用的是 [Sparkle](https://sparkle-project.org)，二者都是 MIT 许可证，许可声明随应用分发（「关于 DiffCode」）。Windows 版用到 [alacritty_terminal](https://github.com/alacritty/alacritty)、[windows-rs](https://github.com/microsoft/windows-rs) 等 Rust 库，程序旁的 `THIRD-PARTY-NOTICES.txt` 列出全部组件及其许可证。
 
 GPL 授权的是代码，不包括 DiffCode 这个名字和图标。如果你分发修改后的版本，请换一个名字和图标，方便大家区分。

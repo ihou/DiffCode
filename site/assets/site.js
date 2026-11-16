@@ -15,6 +15,17 @@
     onScroll();
   }
 
+  // Mac first unless the visitor is on Windows.
+  if (/Windows/.test(navigator.userAgent || "")) {
+    document.querySelectorAll(".cta").forEach(function (cta) {
+      var mac = cta.querySelector('[data-os="mac"]'), win = cta.querySelector('[data-os="windows"]');
+      if (!mac || !win) return;
+      mac.classList.add("alt");
+      win.classList.remove("alt");
+      cta.insertBefore(win, mac);
+    });
+  }
+
   // The page ships with the version it was written for; the GitHub API keeps it current after later releases.
   fetch("https://api.github.com/repos/ihou/DiffCode/releases/latest", { headers: { Accept: "application/vnd.github+json" } })
     .then(function (response) { return response.ok ? response.json() : Promise.reject(response.status); })
@@ -27,6 +38,11 @@
         document.querySelectorAll("[data-size]").forEach(function (el) { el.textContent = size; });
         var rounded = String(Math.max(1, Math.round(pkg.size / 1048576)));
         document.querySelectorAll("[data-size-round]").forEach(function (el) { el.textContent = rounded; });
+      }
+      var exe = (release.assets || []).filter(function (asset) { return asset.name === "DiffCode-Setup-x64.exe"; })[0];
+      if (exe && exe.size) {
+        var exeSize = (exe.size / 1048576).toFixed(1);
+        document.querySelectorAll("[data-size-win]").forEach(function (el) { el.textContent = exeSize; });
       }
     })
     .catch(function () { /* keep the built-in text */ });
