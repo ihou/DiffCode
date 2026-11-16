@@ -105,9 +105,11 @@ jobs:
           Copy-Item target/THIRD-PARTY-NOTICES.txt target/portable/DiffCode/
           Compress-Archive -Path target/portable/DiffCode -DestinationPath "$dist/DiffCode-windows-x64.zip"
 
-          Get-ChildItem $dist -File | ForEach-Object {
+          # LF line ends, so `shasum -c` / `sha256sum -c` read the names on macOS and Linux too.
+          $sums = Get-ChildItem $dist -File | ForEach-Object {
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
-          } | Set-Content -Encoding ascii "$dist/SHA256SUMS-windows.txt"
+          }
+          [IO.File]::WriteAllText("$dist/SHA256SUMS-windows.txt", (($sums -join "`n") + "`n"))
           Get-ChildItem $dist | Format-Table Name, Length
           Get-Content "$dist/SHA256SUMS-windows.txt"
 
