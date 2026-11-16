@@ -66,7 +66,8 @@ Checked against `docs/GUIDE.zh-CN.md`, feature by feature, in the Mac harness (`
 | Icon, version and manifest resources | done (`crates/app/build.rs`, `res/`) |
 | Welcome screen shows the app icon | done (read from the exe's icon resource; the Mac too, from `NSApp.applicationIconImage`) |
 | Installer, portable zip, CI | done (see Releases) |
-| Updates | todo (the Mac uses Sparkle; Windows has no updater yet) |
+| Update check | done: GitHub's latest release at launch and daily (Settings → Check for updates), offered in the sidebar, a toast and a dialog; Download opens the release page. Only a release that carries the Windows installer counts. WinINet, so Windows' proxy settings apply |
+| Third-party notices | done (`installer/notices.py`, shipped as `THIRD-PARTY-NOTICES.txt` beside the program) |
 
 Terminal on Windows: PowerShell 7 (`pwsh.exe`), else Windows PowerShell, else `%COMSPEC%`. Keys follow Windows
 Terminal: Ctrl+Shift+T new, Ctrl+Shift+W close, Ctrl+C copies a selection (else interrupts), Ctrl+V / Ctrl+Shift+V
@@ -103,9 +104,14 @@ tests, `cargo build --release` (MSVC, C runtime linked in, so no Visual C++ Redi
   (`%LOCALAPPDATA%\Programs\DiffCode`, Start menu, optional desktop shortcut, uninstaller; `/ALLUSERS` for everyone).
   English and Simplified Chinese, light or dark with Windows.
 - `DiffCode-windows-x64.zip` — the same program to unzip and run.
+
+Both carry `LICENSE.txt` and `THIRD-PARTY-NOTICES.txt` (every crate compiled in, with its license text).
 - `SHA256SUMS-windows.txt`.
 
-Publishing a GitHub release attaches them to it; so does running the workflow by hand with a tag. The version is
+Publishing a GitHub release attaches them to it; so does running the workflow by hand with a tag. A release is one
+tag for both platforms: bump `release/version.env`, publish the Mac build as `release/macos/README.md` describes,
+then `gh release create v<version> dist/macos/… --notes-file release/github/<version>.md`; the Windows assets
+follow a few minutes later, and only then does the update check offer the release to Windows users. The version is
 `MARKETING_VERSION` in `release/version.env`, which `windows/Cargo.toml` must match (the workflow checks), and the
 executable's fourth version number is `BUILD_NUMBER`. The file names carry no version, so
 `releases/latest/download/DiffCode-Setup-x64.exe` always fetches the newest, like `DiffCode.pkg` for the Mac.
