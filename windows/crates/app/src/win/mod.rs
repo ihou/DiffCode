@@ -1439,3 +1439,19 @@ impl Platform for WinPlatform {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use diffcode_ui::app::update::{parse_release, LATEST};
+
+    /// The real request the update check makes, through WinINet and whatever proxy Windows is set to use. It needs
+    /// the network, so it runs only when asked: `cargo test -p diffcode -- --ignored`.
+    #[test]
+    #[ignore]
+    fn asks_github_for_the_latest_release() {
+        let reply = super::web_get(LATEST).expect("the request fails");
+        assert!(reply.contains("\"tag_name\""), "unexpected reply: {}", &reply[..reply.len().min(300)]);
+        parse_release(&reply).expect("the reply does not parse");
+        eprintln!("latest release: {:?}", parse_release(&reply));
+    }
+}

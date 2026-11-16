@@ -12,7 +12,7 @@ use crate::core::lf;
 use crate::icons::Icon;
 use crate::platform::HttpGet;
 
-const LATEST: &str = "https://api.github.com/repos/ihou/DiffCode/releases/latest";
+pub const LATEST: &str = "https://api.github.com/repos/ihou/DiffCode/releases/latest";
 const RELEASE_PAGE: &str = "https://github.com/ihou/DiffCode/releases/tag/";
 const INSTALLER: &str = "DiffCode-Setup-x64.exe";
 const DAY: Duration = Duration::from_secs(24 * 60 * 60);
