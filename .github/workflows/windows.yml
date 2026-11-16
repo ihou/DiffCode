@@ -1,0 +1,131 @@
+# Builds DiffCode for Windows: runs the tests, builds DiffCode.exe, and packages an installer (Inno Setup) and a
+# portable zip with their SHA-256 checksums.
+# - Every push to main and every pull request that touches windows/ keeps them as a workflow artifact.
+# - Publishing a GitHub release, or running this by hand with a release tag, attaches them to that release.
+# The executables are not code-signed (see windows/PORTING.md, "Releases").
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    paths: ["windows/**", "release/version.env", ".github/workflows/windows.yml"]
+  pull_request:
+    paths: ["windows/**", "release/version.env", ".github/workflows/windows.yml"]
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Attach the build to this release tag (empty: build only)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: pwsh
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v5
+
+      - name: Read the version
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          $versionFile = Get-Content release/version.env
+          $marketing = ($versionFile | Select-String '^MARKETING_VERSION=(\S+)').Matches[0].Groups[1].Value
+          $build = ($versionFile | Select-String '^BUILD_NUMBER=(\d+)').Matches[0].Groups[1].Value
+          $cargo = (Get-Content windows/Cargo.toml | Select-String '^version = "([^"]+)"').Matches[0].Groups[1].Value
+          if ($cargo -ne $marketing) { throw "windows/Cargo.toml says $cargo but release/version.env says $marketing" }
+          if ($env:TAG -and $env:TAG -ne "v$marketing") { throw "Release $env:TAG is not version $marketing" }
+          "version=$marketing" >> $env:GITHUB_OUTPUT
+          "build=$build" >> $env:GITHUB_OUTPUT
+          rustc --version
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            windows/target
+          key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
+          restore-keys: windows-cargo-
+
+      - name: Test
+        working-directory: windows
+        run: cargo test --workspace --locked
+
+      - name: Build
+        working-directory: windows
+        run: cargo build -p diffcode --release --locked
+
+      - name: Package
+        working-directory: windows
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.version.outputs.build }}
+        run: |
+          $dist = "target/dist"
+          Remove-Item -Recurse -Force $dist, target/portable -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $dist | Out-Null
+
+          # The installer. Inno Setup comes with GitHub's Windows images.
+          $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) {
+            $iscc = Get-ChildItem "${env:ProgramFiles(x86)}", "$env:ProgramFiles" -Filter ISCC.exe -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+              Select-Object -First 1 -ExpandProperty FullName
+          }
+          if (-not $iscc) { throw "Inno Setup (ISCC.exe) not found" }
+          & $iscc /Qp "/DAppVersion=$env:VERSION" "/DAppBuild=$env:BUILD" installer/DiffCode.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed ($LASTEXITCODE)" }
+
+          # The portable zip: the program in a DiffCode folder, nothing to install.
+          New-Item -ItemType Directory -Force target/portable/DiffCode | Out-Null
+          Copy-Item target/release/DiffCode.exe target/portable/DiffCode/
+          Copy-Item ../LICENSE target/portable/DiffCode/LICENSE.txt
+          Compress-Archive -Path target/portable/DiffCode -DestinationPath "$dist/DiffCode-windows-x64.zip"
+
+          Get-ChildItem $dist -File | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content -Encoding ascii "$dist/SHA256SUMS-windows.txt"
+          Get-ChildItem $dist | Format-Table Name, Length
+          Get-Content "$dist/SHA256SUMS-windows.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DiffCode-windows-${{ steps.version.outputs.version }}
+          path: windows/target/dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: DiffCode-windows-${{ needs.build.outputs.version }}
+          path: dist
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"
