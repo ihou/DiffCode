@@ -231,6 +231,7 @@ pub fn commands(app: &App) -> Vec<Command> {
         Command::new("help.keymap", l("Keymap Reference", "快捷键一览"), Icon::Keyboard, Navigate, |a| a.present(Popup::Keymap))
             .key(Char('/'), CTRL)
             .sep(),
+        Command::new("help.updates", l("Check for Updates…", "检查更新…"), Icon::ArrowDownload, Navigate, |a| a.check_for_updates(true)),
         // Git. DiffCode reads the repository and otherwise leaves it alone; these are the exceptions.
         Command::new("git.commit", l("Commit…", "提交…"), Icon::CheckmarkCircle, Git, |a| a.commit_shortcut()).key(Char('k'), CTRL),
         Command::new("git.commitPush", l("Commit and Push…", "提交并推送…"), Icon::ArrowUpload, Git, |a| a.commit_current(true))

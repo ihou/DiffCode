@@ -157,7 +157,8 @@ fn render_app(args: &[String], out: &str, dark: bool) {
             self.0 = Some(text.to_string());
         }
     }
-    struct Harness(Clip);
+    /// The clipboard, and the reply a fake GitHub gives to the update check (`--update-json <file>`).
+    struct Harness(Clip, Option<String>);
     impl Platform for Harness {
         fn clipboard(&mut self) -> &mut dyn Clipboard {
             &mut self.0
@@ -182,6 +183,10 @@ fn render_app(args: &[String], out: &str, dark: bool) {
         // Drawn as on Windows, where the interface has the title bar.
         fn caption_buttons(&self) -> bool {
             true
+        }
+        fn http_get(&self) -> Option<diffcode_ui::platform::HttpGet> {
+            let json = self.1.clone()?;
+            Some(std::sync::Arc::new(move |_: &str| Ok(json.clone())))
         }
         fn app_icon(&self, pixels: u32) -> Option<std::sync::Arc<Vec<u8>>> {
             let ico = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/res/DiffCode.ico")).ok()?;
@@ -208,7 +213,7 @@ fn render_app(args: &[String], out: &str, dark: bool) {
     let mut app = App::new(settings);
     let backend = mac::MacBackend::new();
     let mut st = UiState::default();
-    let mut platform = Harness(Clip(None));
+    let mut platform = Harness(Clip(None), flag("--update-json").and_then(|p| std::fs::read_to_string(p).ok()));
 
     let mut run = |app: &mut App, st: &mut UiState, event: Option<Event>, write: bool| {
         if let Some(e) = &event {
@@ -240,6 +245,7 @@ fn render_app(args: &[String], out: &str, dark: bool) {
         Some("find") => app.show_find_in_path(),
         Some("keymap") => app.present(Popup::Keymap),
         Some("settings") => app.present(Popup::Settings),
+        Some("update") => app.show_update_dialog(),
         Some("graph") => app.toggle_git_graph(),
         Some("goto") => app.show_go_to_line(),
         Some("log") => app.toggle_tab(diffcode_ui::app::project::ProjectTab::Log),

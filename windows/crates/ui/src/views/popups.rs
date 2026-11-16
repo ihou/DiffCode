@@ -796,8 +796,11 @@ fn left_empty(filter: &str, content: f32, pad: f32) -> bool {
 fn settings(app: &mut App, ui: &mut Ui, room: Rect) {
     let t = ui.theme;
     let restart = app.language_needs_restart();
-    let rows = if app.has_terminal() { 6.0 } else { 5.0 };
-    let h = t.s(48.0) + 1.0 + t.s(20.0) * 2.0 + rows * t.s(28.0) + (rows - 1.0) * t.s(16.0) + if restart { t.s(32.0) } else { 0.0 };
+    let updates = app.updates_supported();
+    let rows = if app.has_terminal() { 6.0 } else { 5.0 } + if updates { 1.0 } else { 0.0 };
+    let h = t.s(48.0) + 1.0 + t.s(20.0) * 2.0 + rows * t.s(28.0) + (rows - 1.0) * t.s(16.0)
+        + if restart { t.s(32.0) } else { 0.0 }
+        + if updates { t.s(32.0) } else { 0.0 };
     let rect = Rect::new(room.x, room.y, room.w, h.min(room.h)).snapped(ui.painter.scale());
     panel(ui, rect);
     if ui.take_key(Key::Escape, Modifiers::NONE) {
@@ -876,6 +879,56 @@ fn settings(app: &mut App, ui: &mut Ui, room: Rect) {
     if let Some(i) = segmented(ui, Id::new("set-view"), Rect::new(r.right() - control_w, r.y, control_w, r.h), &titles, current) {
         if (i == 1) != app.settings.unified {
             app.toggle_unified();
+        }
+    }
+
+    if updates {
+        let r = row(ui, &mut y, &l("Check for updates", "检查更新"));
+        let titles = vec![l("Automatically", "自动"), l("Manually", "手动")];
+        let current = usize::from(!app.settings.check_updates);
+        if let Some(i) = segmented(ui, Id::new("set-updates"), Rect::new(r.right() - control_w, r.y, control_w, r.h), &titles, current) {
+            app.settings.check_updates = i == 0;
+            app.settings.save();
+            if app.settings.check_updates {
+                app.check_for_updates(false);
+            }
+        }
+        // Where things stand, and the one thing to do about it.
+        let current = crate::app::update::CURRENT;
+        let (note, button, enabled) = if app.update.checking {
+            (l("Checking…", "正在检查…"), l("Check Now", "立即检查"), false)
+        } else if let Some(release) = &app.update.available {
+            let v = &release.version;
+            (lf!("DiffCode {v} is available", "DiffCode {v} 已发布"), l("Download…", "下载…"), true)
+        } else {
+            let note = match &app.update.last {
+                Some(Err(e)) => lf!("Couldn't check: {e}", "检查失败：{e}"),
+                Some(Ok(())) => lf!("DiffCode {current} is up to date", "DiffCode {current} 已是最新版本"),
+                None => lf!("This is DiffCode {current}", "当前版本 {current}"),
+            };
+            (note, l("Check Now", "立即检查"), true)
+        };
+        let line = Rect::new(body.x, y - t.s(10.0), body.w, t.s(24.0));
+        let bf = t.font_w(11.0, Weight::Semibold);
+        let bw = ui.text_width(&button, bf).ceil() + t.s(18.0);
+        let b = Rect::new(line.right() - bw, line.center().y - t.s(11.0), bw, t.s(22.0));
+        let hit = ui.interact(Id::new("check-updates"), b);
+        let offer = app.update.available.is_some() && !app.update.checking;
+        if offer {
+            ui.round(b, t.s(6.0), t.accent.alpha(if hit.hovered { 0.85 } else { 1.0 }));
+            ui.label_with(b, &button, bf, Color::WHITE, Align::Center, Overflow::Clip);
+        } else {
+            ui.round(b, t.s(6.0), if hit.hovered && enabled { t.hover } else { t.text.alpha(0.06) });
+            ui.label_with(b, &button, bf, if enabled { t.text } else { t.text3 }, Align::Center, Overflow::Clip);
+        }
+        let nw = (b.x - t.s(8.0) - line.x).max(0.0);
+        ui.label_with(Rect::new(line.x, line.y, nw, line.h), &note, t.font(11.5), t.text3, Align::Right, Overflow::Ellipsis);
+        if hit.clicked && enabled {
+            if offer {
+                app.show_update_dialog();
+            } else {
+                app.check_for_updates(true);
+            }
         }
     }
 }

@@ -21,6 +21,7 @@ pub mod search;
 pub mod settings;
 pub mod stash_actions;
 pub mod terminal;
+pub mod update;
 pub mod viewer;
 
 use std::collections::HashMap;
@@ -240,6 +241,8 @@ pub struct App {
     pub drop_targeted: bool,
     /// Width the window's caption buttons take at the right of the top bar (0 with a system title bar).
     pub caption_width: f32,
+    /// Newer releases (Windows only).
+    pub update: update::Updates,
     /// The app's icon for the welcome screen, with the pixel size it was picked for.
     pub app_icon: Option<(u32, crate::paint::ImageSource)>,
     /// When to search the Log, once typing in its search field pauses.
@@ -299,6 +302,7 @@ impl App {
             views: Default::default(),
             drop_targeted: false,
             caption_width: 0.0,
+            update: Default::default(),
             app_icon: None,
             log_search_at: None,
             system_chinese: false,
@@ -359,6 +363,7 @@ impl App {
         self.sync_viewer();
         // Without Git there is nothing to show; the panels make way for how to get it.
         self.git_missing = !git::is_available();
+        self.start_updates(platform.http_get());
     }
 
     /// Looks for Git again (after installing it).
@@ -393,6 +398,7 @@ impl App {
     /// Runs what finished in the background and what models asked for. Returns when something next wants to run.
     fn tick(&mut self) -> Option<Instant> {
         Jobs::run(self, |a| &mut a.jobs);
+        self.tick_updates();
         let mut next = self.viewer.tick();
         let visible = self.window_visible;
         for p in &mut self.projects {

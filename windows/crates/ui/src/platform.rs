@@ -16,6 +16,9 @@ pub enum WindowCommand {
     Close,
 }
 
+/// Fetches a URL's body as text, from any thread (an HTTPS GET through the system's proxy settings).
+pub type HttpGet = Arc<dyn Fn(&str) -> Result<String, String> + Send + Sync>;
+
 /// Wakes the interface from another thread: the shell runs a frame soon after, on its own thread.
 pub type Waker = Arc<dyn Fn() + Send + Sync>;
 
@@ -52,6 +55,10 @@ pub trait Platform {
     }
     fn window_command(&mut self, command: WindowCommand) {
         let _ = command;
+    }
+    /// Fetching from the web, for the update check; None where DiffCode does not look for updates itself.
+    fn http_get(&self) -> Option<HttpGet> {
+        None
     }
     /// The app's icon as PNG, the size nearest `pixels` (the smallest at least that big, when there is one).
     fn app_icon(&self, pixels: u32) -> Option<Arc<Vec<u8>>> {

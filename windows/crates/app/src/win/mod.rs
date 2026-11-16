@@ -17,7 +17,7 @@ use std::time::Instant;
 use diffcode_ui::geom::{Point, Rect, Size};
 use diffcode_ui::input::{Event, Key, Modifiers, MouseButton};
 use diffcode_ui::paint::CursorIcon;
-use diffcode_ui::platform::{Platform, Program, Waker, WindowCommand};
+use diffcode_ui::platform::{HttpGet, Platform, Program, Waker, WindowCommand};
 use diffcode_ui::text_field::Clipboard;
 use diffcode_ui::ui::{maximize_button_id, window_drag_id, Ui, UiState};
 use render::{DxBackend, DxPainter};
@@ -28,6 +28,12 @@ use windows::Win32::Graphics::Gdi::{
     GetMonitorInfoW, InvalidateRect, MonitorFromWindow, ScreenToClient, ValidateRect, MONITORINFO, MONITOR_DEFAULTTONEAREST,
 };
 use windows::Win32::Globalization::GetUserDefaultUILanguage;
+use windows::Win32::Networking::WinInet::{
+    HttpQueryInfoW, InternetCloseHandle, InternetOpenUrlW, InternetOpenW, InternetReadFile, InternetSetOptionW,
+    HTTP_QUERY_FLAG_NUMBER, HTTP_QUERY_STATUS_CODE, INTERNET_FLAG_NO_CACHE_WRITE, INTERNET_FLAG_NO_COOKIES,
+    INTERNET_FLAG_NO_UI, INTERNET_FLAG_RELOAD, INTERNET_OPEN_TYPE_PRECONFIG, INTERNET_OPTION_CONNECT_TIMEOUT,
+    INTERNET_OPTION_RECEIVE_TIMEOUT, INTERNET_OPTION_SEND_TIMEOUT,
+};
 use windows::Win32::System::Com::*;
 use windows::Win32::System::DataExchange::*;
 use windows::Win32::System::LibraryLoader::{FindResourceW, GetModuleHandleW, LoadResource, LockResource, SizeofResource};
@@ -703,6 +709,70 @@ fn set_icons(hwnd: HWND, dpi: u32) {
     }
 }
 
+/// An HTTPS GET with WinINet, which goes through the proxy set in Windows' Internet settings, as a browser would.
+fn web_get(url: &str) -> Result<String, String> {
+    struct Handle(*mut core::ffi::c_void);
+    impl Drop for Handle {
+        fn drop(&mut self) {
+            if !self.0.is_null() {
+                unsafe {
+                    let _ = InternetCloseHandle(self.0);
+                }
+            }
+        }
+    }
+    let failed = || {
+        use diffcode_ui::core::lang::l;
+        // WinINet's own codes (wininet.h); the system has no text for them outside wininet.dll.
+        match unsafe { GetLastError() }.0 {
+            12002 => l("the connection timed out", "连接超时"),
+            12007 => l("the server could not be found", "找不到服务器"),
+            12029 | 12030 => l("could not connect to the server", "无法连接到服务器"),
+            12175 | 12157 | 12045 | 12038 | 12037 => l("the secure connection failed", "安全连接失败"),
+            code => l(&format!("network error {code}"), &format!("网络错误 {code}")),
+        }
+    };
+    unsafe {
+        let agent = HSTRING::from(format!("DiffCode/{}", env!("CARGO_PKG_VERSION")));
+        let session = Handle(InternetOpenW(&agent, INTERNET_OPEN_TYPE_PRECONFIG.0, PCWSTR::null(), PCWSTR::null(), 0));
+        if session.0.is_null() {
+            return Err(failed());
+        }
+        let timeout: u32 = 20_000;
+        for option in [INTERNET_OPTION_CONNECT_TIMEOUT, INTERNET_OPTION_SEND_TIMEOUT, INTERNET_OPTION_RECEIVE_TIMEOUT] {
+            let _ = InternetSetOptionW(Some(session.0), option, Some(&timeout as *const u32 as *const _), 4);
+        }
+        let headers: Vec<u16> = "Accept: application/vnd.github+json\r\n".encode_utf16().collect();
+        let flags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE | INTERNET_FLAG_NO_COOKIES | INTERNET_FLAG_NO_UI;
+        let request = Handle(InternetOpenUrlW(session.0, &HSTRING::from(url), Some(&headers), flags, None));
+        if request.0.is_null() {
+            return Err(failed());
+        }
+        let mut status = 0u32;
+        let mut len = 4u32;
+        let _ = HttpQueryInfoW(request.0, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, Some(&mut status as *mut u32 as *mut _), &mut len, None);
+        let mut body = Vec::new();
+        let mut buf = vec![0u8; 16 * 1024];
+        loop {
+            let mut read = 0u32;
+            if InternetReadFile(request.0, buf.as_mut_ptr() as *mut _, buf.len() as u32, &mut read).is_err() {
+                return Err(failed());
+            }
+            if read == 0 {
+                break;
+            }
+            body.extend_from_slice(&buf[..read as usize]);
+            if body.len() > 4 << 20 {
+                return Err("reply too large".into());
+            }
+        }
+        if status != 200 {
+            return Err(format!("HTTP {status}"));
+        }
+        String::from_utf8(body).map_err(|_| "reply is not text".into())
+    }
+}
+
 /// Bytes of one of the executable's own resources.
 fn resource(name: PCWSTR, kind: PCWSTR) -> Option<&'static [u8]> {
     unsafe {
@@ -1333,6 +1403,10 @@ impl Platform for WinPlatform {
 
     fn window_command(&mut self, command: WindowCommand) {
         self.pending_command = Some(command);
+    }
+
+    fn http_get(&self) -> Option<HttpGet> {
+        Some(Arc::new(web_get))
     }
 
     fn app_icon(&self, pixels: u32) -> Option<Arc<Vec<u8>>> {

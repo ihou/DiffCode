@@ -272,6 +272,29 @@ fn sidebar_footer(app: &mut App, ui: &mut Ui, rect: Rect) {
     if icon_button(ui, Id::new("footer-settings"), settings, Icon::Settings, &l("Settings (Ctrl+Alt+S)", "设置 (Ctrl+Alt+S)"), true, false).clicked {
         app.present(Popup::Settings);
     }
+
+    // A newer release: a quiet pill until it is installed or skipped (just the arrow when the sidebar is narrow).
+    if let Some(release) = app.update_offered() {
+        let v = release.version.clone();
+        let text = l("Update", "更新");
+        let font = t.font_w(11.0, Weight::Semibold);
+        let glyph = t.s(12.0);
+        let full = t.s(8.0) + glyph + t.s(4.0) + ui.text_width(&text, font).ceil() + t.s(9.0);
+        let right = keymap.x - t.s(6.0);
+        let w = if right - full >= label.right() + t.s(8.0) { full } else { t.s(26.0) };
+        let r = Rect::new(right - w, rect.center().y - t.s(11.0), w, t.s(22.0));
+        let hit = ui.interact(Id::new("footer-update"), r);
+        ui.round(r, t.s(11.0), t.accent.alpha(if hit.hovered { 0.24 } else { 0.14 }));
+        let gx = if w == full { r.x + t.s(8.0) } else { r.center().x - glyph / 2.0 };
+        ui.icon(Icon::ArrowDownload, Rect::new(gx, r.center().y - glyph / 2.0, glyph, glyph), t.accent);
+        if w == full {
+            ui.label_with(Rect::new(gx + glyph + t.s(4.0), r.y, r.right() - gx - glyph - t.s(4.0), r.h), &text, font, t.accent, Align::Left, Overflow::Clip);
+        }
+        ui.tooltip(&hit, &lf!("DiffCode {v} is available", "DiffCode {v} 已发布"));
+        if hit.clicked {
+            app.show_update_dialog();
+        }
+    }
 }
 
 /// Shown when there are no projects yet.

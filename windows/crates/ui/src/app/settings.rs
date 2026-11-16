@@ -101,6 +101,10 @@ pub struct Settings {
     /// The window's place: x, y, width, height in pixels, and whether maximised.
     pub window: Option<(i32, i32, i32, i32, bool)>,
     pub recent_actions: Vec<String>,
+    /// Look for a newer release at launch and daily (Windows).
+    pub check_updates: bool,
+    /// A release the user chose to skip: not offered again until a newer one.
+    pub skipped_update: Option<String>,
     file: Option<PathBuf>,
 }
 
@@ -129,6 +133,8 @@ impl Default for Settings {
             selected_project: None,
             window: None,
             recent_actions: Vec::new(),
+            check_updates: true,
+            skipped_update: None,
             file: None,
         }
     }
@@ -184,6 +190,8 @@ impl Settings {
             s.commit_box_height = clamp(v, COMMIT_BOX_RANGE);
         }
         s.follow_file = b("followFile").unwrap_or(false);
+        s.check_updates = b("checkUpdates").unwrap_or(true);
+        s.skipped_update = map.get("skippedUpdate").filter(|v| !v.is_empty()).map(|v| v.to_string());
         s.selected_project = map.get("selectedProject").map(PathBuf::from);
         if let Some(v) = map.get("window") {
             let parts: Vec<&str> = v.split(',').collect();
@@ -219,6 +227,10 @@ impl Settings {
         put("terminalHeight", self.terminal_height.to_string());
         put("commitBoxHeight", self.commit_box_height.to_string());
         put("followFile", self.follow_file.to_string());
+        put("checkUpdates", self.check_updates.to_string());
+        if let Some(v) = &self.skipped_update {
+            put("skippedUpdate", v.clone());
+        }
         if let Some(p) = &self.selected_project {
             put("selectedProject", p.display().to_string());
         }
@@ -257,6 +269,8 @@ mod tests {
         s.projects = vec![PathBuf::from("C:\\work\\a"), PathBuf::from("D:\\b c")];
         s.selected_project = Some(PathBuf::from("D:\\b c"));
         s.window = Some((10, 20, 1200, 800, true));
+        s.check_updates = false;
+        s.skipped_update = Some("0.3.1".into());
         s.save();
         let t = Settings::load(&file);
         assert_eq!(t, s);
