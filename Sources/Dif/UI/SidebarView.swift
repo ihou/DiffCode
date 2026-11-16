@@ -248,10 +248,11 @@ struct WelcomeView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Image(systemName: "arrow.left.arrow.right.square.fill")
-                .font(.ui(size: 54))
-                .foregroundStyle(LinearGradient(colors: [Color(NSColor(hex: 0x5B8DEF)), Color(NSColor(hex: 0x34C8A0))],
-                                                startPoint: .topLeading, endPoint: .bottomTrailing))
+            // The app's own icon; its tile fills about 80% of the image (Apple's grid), so it shows at about 54 pt.
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .interpolation(.high)
+                .frame(width: UI.s(68), height: UI.s(68))
             VStack(spacing: 6) {
                 Text(L("Welcome to \(appName)", "欢迎使用 \(appName)"))
                     .font(.ui(size: 22, weight: .semibold))
