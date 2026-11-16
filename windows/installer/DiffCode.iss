@@ -1,6 +1,6 @@
 ; The Windows installer, built with Inno Setup 6 by .github/workflows/windows.yml:
-;   ISCC /DAppVersion=0.3.0 /DAppBuild=3 windows\installer\DiffCode.iss
-; after `cargo build -p diffcode --release` in windows\.
+;   ISCC /DAppVersion=0.3.1 /DAppBuild=4 windows\installer\DiffCode.iss
+; after, in windows\, `cargo build -p diffcode --release` and `python installer\notices.py target\THIRD-PARTY-NOTICES.txt`.
 ;
 ; It installs for the current user (no administrator prompt) into %LOCALAPPDATA%\Programs\DiffCode, with a Start
 ; menu entry and, if asked, a desktop shortcut; /ALLUSERS on the command line installs for everyone instead.
@@ -69,6 +69,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\..\LICENSE"; DestDir: "{app}"; DestName: "LICENSE.txt"; Flags: ignoreversion
+Source: "..\target\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\DiffCode"; Filename: "{app}\DiffCode.exe"

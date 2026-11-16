@@ -84,6 +84,10 @@ jobs:
           Remove-Item -Recurse -Force $dist, target/portable -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force $dist | Out-Null
 
+          # The licenses of everything compiled in, shipped beside the program.
+          python installer/notices.py target/THIRD-PARTY-NOTICES.txt
+          if ($LASTEXITCODE -ne 0) { throw "notices.py failed ($LASTEXITCODE)" }
+
           # The installer. Inno Setup comes with GitHub's Windows images.
           $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
           if (-not $iscc) {
@@ -98,6 +102,7 @@ jobs:
           New-Item -ItemType Directory -Force target/portable/DiffCode | Out-Null
           Copy-Item target/release/DiffCode.exe target/portable/DiffCode/
           Copy-Item ../LICENSE target/portable/DiffCode/LICENSE.txt
+          Copy-Item target/THIRD-PARTY-NOTICES.txt target/portable/DiffCode/
           Compress-Archive -Path target/portable/DiffCode -DestinationPath "$dist/DiffCode-windows-x64.zip"
 
           Get-ChildItem $dist -File | ForEach-Object {
