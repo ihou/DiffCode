@@ -127,8 +127,9 @@ pub fn stamp(path: &Path) -> Option<Stamp> {
 pub enum Backup {
     /// A copy of the earlier contents.
     Copy(PathBuf),
-    /// The file itself, moved to the Recycle Bin: undoing moves it back.
-    Recycled(recycle::Item),
+    /// The file itself, moved to the Recycle Bin: undoing moves it back. None when it went there but could not be
+    /// found again, so it cannot be undone (and undo says so rather than claim it came back).
+    Recycled(Option<recycle::Item>),
 }
 
 #[derive(Clone, Debug)]
@@ -419,7 +420,7 @@ pub fn trash(changes: &[FileChange], root: &Path) -> Result<(Record, Vec<String>
     let moved = recycle::delete(&full_paths);
     for ((path, _), item) in existing.into_iter().zip(moved) {
         match item {
-            Ok(item) => record.entries.push(Entry { path, backup: item.map(Backup::Recycled), after: None }),
+            Ok(item) => record.entries.push(Entry { path, backup: Some(Backup::Recycled(item)), after: None }),
             Err(_) => failed.push(path),
         }
     }
@@ -441,11 +442,12 @@ pub fn undo(record: &Record) -> (Vec<(String, Option<Stamp>)>, usize) {
         }
         let outcome = (|| -> std::io::Result<bool> {
             match &entry.backup {
-                Some(Backup::Recycled(item)) => {
+                Some(Backup::Recycled(None)) => Ok(false),
+                Some(Backup::Recycled(Some(item))) => {
                     if let Some(parent) = path.parent() {
                         std::fs::create_dir_all(parent)?;
                     }
-                    Ok(recycle::restore(item, &path))
+                    Ok(recycle::restore(item, &path) && stamp(&path).is_some())
                 }
                 backup => {
                     if entry.after.is_some() {
@@ -496,22 +498,24 @@ pub mod recycle {
     /// cannot be found there again, so it cannot be undone), or an error when it was not moved.
     #[cfg(windows)]
     pub fn delete(paths: &[PathBuf]) -> Vec<Result<Option<Item>, String>> {
+        let key = |p: &Path| {
+            let s = p.to_string_lossy().replace('/', "\\");
+            s.strip_prefix(r"\\?\").unwrap_or(&s).to_lowercase()
+        };
+        // The Recycle Bin remembers the full long path; the one given may be relative to a short (8.3) name such as
+        // C:\Users\RUNNER~1, so it is resolved while the file is still there.
+        let wanted: Vec<String> = paths.iter().map(|p| key(&std::fs::canonicalize(p).unwrap_or_else(|_| p.clone()))).collect();
         let results: Vec<Result<(), String>> =
             paths.iter().map(|p| trash::delete(p).map_err(|e| e.to_string())).collect();
         if results.iter().all(|r| r.is_err()) {
             return results.into_iter().map(|r| r.map(|_| None)).collect();
         }
         let listed = trash::os_limited::list().unwrap_or_default();
-        let key = |p: &Path| {
-            let s = p.to_string_lossy().replace('/', "\\");
-            s.strip_prefix(r"\\?\").unwrap_or(&s).to_lowercase()
-        };
-        paths
-            .iter()
+        wanted
+            .into_iter()
             .zip(results)
-            .map(|(path, r)| {
+            .map(|(wanted, r)| {
                 r.map(|_| {
-                    let wanted = key(path);
                     listed
                         .iter()
                         .filter(|item| key(&item.original_path()) == wanted)
@@ -660,8 +664,19 @@ pub(crate) mod tests {
         let (record, failed) = trash(&status.changes, root).unwrap();
         assert!(failed.is_empty());
         assert!(!root.join("sub/new.txt").exists());
+        assert!(matches!(record.entries[0].backup, Some(Backup::Recycled(Some(_)))), "lost in the Recycle Bin: {:?}", record.entries);
         let (_, skipped) = undo(&record);
         assert_eq!(skipped, 0);
         assert_eq!(std::fs::read_to_string(root.join("sub/new.txt")).unwrap(), "n\n");
+    }
+
+    #[test]
+    fn undo_skips_what_the_recycle_bin_lost() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut record = Record::new(dir.path());
+        record.entries.push(Entry { path: "gone.txt".into(), backup: Some(Backup::Recycled(None)), after: None });
+        let (restored, skipped) = undo(&record);
+        assert!(restored.is_empty());
+        assert_eq!(skipped, 1);
     }
 }
