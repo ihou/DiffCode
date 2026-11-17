@@ -27,6 +27,7 @@ require_command swift
 require_command ditto
 require_command shasum
 require_command codesign
+require_command lipo
 
 if [[ -n "$TEAM_ID" && -z "$DEVELOPER_ID_APP" ]]; then
   DEVELOPER_ID_APP="$(resolve_identity "Developer ID Application" "$TEAM_ID")"
@@ -39,12 +40,22 @@ app_dist_path="$DIST_DIR/$APP_NAME.app"
 mkdir -p "$DIST_DIR"
 
 print_step "Building and signing $APP_NAME.app"
+ARCH="${ARCH:-arm64}" \
 EDITION=direct \
 OUTPUT_DIR="$DIST_DIR" \
 SIGN_IDENTITY="$DEVELOPER_ID_APP" \
 HARDENED_RUNTIME=1 \
 ENTITLEMENTS="$APP_ENTITLEMENTS" \
 "$PROJECT_ROOT_DIR/Scripts/build-app.sh"
+
+# 默认是 Apple Silicon 版；Intel 版（ARCH=x86_64）单独构建、单独下载，好让前者保持小巧。
+expected_archs="${ARCH:-arm64}"
+[[ "${UNIVERSAL:-0}" == "1" ]] && expected_archs="arm64 x86_64"
+sorted_words() { tr ' ' '\n' | sed '/^$/d' | sort | xargs; }
+actual_archs="$(lipo -archs "$app_dist_path/Contents/MacOS/$APP_NAME" | sorted_words)"
+[[ "$actual_archs" == "$(sorted_words <<<"$expected_archs")" ]] \
+  || fail "the app is built for $actual_archs, not $expected_archs"
+print_step "Architecture: $actual_archs"
 
 info_plist="$app_dist_path/Contents/Info.plist"
 bundle_id="$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$info_plist")"

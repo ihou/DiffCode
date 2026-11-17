@@ -4,6 +4,7 @@
 #
 #   ./build_macos.sh                         完整构建：app + zip + pkg
 #   RUN_RELEASE_BUILD=0 ./build_macos.sh     只用 dist/macos 里现成的 app 重新打 pkg
+#   ARCH=x86_64 ./build_macos.sh             Intel 版，放在 dist/macos-intel（见 release/macos/scripts/arch_lane.sh）
 
 set -euo pipefail
 
@@ -36,6 +37,8 @@ load_env_defaults() {
 }
 
 load_env_defaults "$ENV_FILE"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/release/macos/scripts/arch_lane.sh"
 
 TEAM_ID="${TEAM_ID:-}"
 PKG_INSTALL_LOCATION="${PKG_INSTALL_LOCATION:-/}"

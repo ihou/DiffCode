@@ -5,6 +5,7 @@
 #   ./upgrade_macos.sh                           构建（含公证）后发布
 #   BUILD_BEFORE_UPGRADE=0 ./upgrade_macos.sh    发布 dist/macos 里现成的 app
 #   DRY_RUN=1 ./upgrade_macos.sh                 只签名、生成 appcast，不上传
+#   ARCH=x86_64 ./upgrade_macos.sh               Intel 版，发布到它自己的更新源（见 release/macos/scripts/arch_lane.sh）
 
 set -euo pipefail
 
@@ -37,6 +38,8 @@ load_env_defaults() {
 }
 
 load_env_defaults "$ENV_FILE"
+# shellcheck disable=SC1091
+source "$ROOT_DIR/release/macos/scripts/arch_lane.sh"
 
 cd "$ROOT_DIR"
 export ENV_FILE_DIR

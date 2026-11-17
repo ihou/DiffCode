@@ -22,12 +22,21 @@
 
 线上 appcast：<https://r2-public.nanshanbei.com/diffcode/macos/stable/appcast.xml>（0.1.0 (1) 于 2026-11-13 发布；0.2.0 (2) 于 2026-11-14 发布；0.3.0 (3) 于 2026-11-14 发布；当前是 0.3.1 (4)，2026-11-15 发布，更新说明见 `release-notes/0.3.1.html`；GitHub Release 上传同一份 zip 和 pkg，固定文件名 `DiffCode.zip` / `DiffCode.pkg`，Windows 的安装包、zip 和 `SHA256SUMS-windows.txt` 由 `.github/workflows/windows.yml` 在发布后自动附加，见 `windows/PORTING.md`）。
 
+## Intel 版
+
+Apple Silicon 版只含 arm64，Intel Mac 打不开。Intel 版单独构建、单独发布，Apple Silicon 版不因此变大：
+
+1. `ARCH=x86_64 ./build_macos.sh`：产物在 `dist/macos-intel/`，同样签名、公证、装订。
+2. `DRY_RUN=1 ARCH=x86_64 ./upgrade_macos.sh`，没问题再 `ARCH=x86_64 ./upgrade_macos.sh`：发布到 Intel 自己的更新源，R2 前缀是 `R2_PREFIX` 后面加 `-intel`（线上是 `diffcode/macos/stable-intel/appcast.xml`），Intel 版应用的 `SUFeedURL` 指向这里。规则见 `release/macos/scripts/arch_lane.sh`。
+3. GitHub Release 上的文件名固定为 `DiffCode-Intel.pkg` / `DiffCode-Intel.zip`，校验和与 Apple Silicon 版的写在同一个 `SHA256SUMS.txt` 里。
+
 ## 脚本会拦下的问题
 
 - 应用里没有 `SUFeedURL` / `SUPublicEDKey`（发出去就再也收不到更新），或 `SUFeedURL` 和这次要发布的 appcast 地址不一致。
 - `R2_PREFIX` 为空：appcast 会落到桶的根目录，桶里放着别的应用时可能覆盖它们的文件。
 - Sparkle 签名和应用内置的 `SUPublicEDKey` 不是一对（`verify_ed_signature.swift` 独立校验，`sign_update --verify` 发现不了这种情况）。
 - 应用没公证、没装订，或 zip 里的不是 `dist/macos` 里这个版本。
+- 构建出的架构不对（`lipo -archs`），或要把一种架构的应用发到另一种架构的更新源：Intel 用户会被「更新」成打不开的版本，反过来也一样。
 - 链接了 Homebrew 的动态库、带 `get-task-allow`、`Installer.xpc` 被沙盒化、嵌套组件不是本团队签名。
 - 上传后公网 appcast 指向的文件不对、长度不符、签名校验失败。
 

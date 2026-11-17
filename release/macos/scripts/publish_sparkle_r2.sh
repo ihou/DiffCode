@@ -317,6 +317,12 @@ fi
 info_plist="$app_bundle_path/Contents/Info.plist"
 [[ -f "$info_plist" ]] || fail "info plist not found: $info_plist"
 
+# Each architecture has its own feed (release/macos/scripts/arch_lane.sh): an Intel app in the Apple Silicon feed,
+# or the other way round, would update people to an app their Mac cannot open.
+app_archs="$(lipo -archs "$app_bundle_path/Contents/MacOS/$APP_NAME" 2>/dev/null || true)"
+[[ "$app_archs" == "${ARCH:-arm64}" ]] \
+  || fail "$app_bundle_path is built for ${app_archs:-nothing}, but this feed is for ${ARCH:-arm64}"
+
 app_public_key="$(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$info_plist" 2>/dev/null || true)"
 [[ -n "$app_public_key" ]] || fail "the app has no SUPublicEDKey; it could not verify any update"
 zip_build_version="$(unzip -p "$zip_path" "$APP_NAME.app/Contents/Info.plist" 2>/dev/null | /usr/bin/plutil -extract CFBundleVersion raw -o - - 2>/dev/null || true)"

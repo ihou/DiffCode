@@ -4,6 +4,7 @@
 #   Scripts/build-app.sh                     the direct download, ad-hoc signed, into ./dist
 #   Scripts/build-app.sh --install           …and copy it to /Applications, linking the `dif` command
 #   EDITION=appstore Scripts/build-app.sh    the sandboxed Mac App Store edition (no Sparkle, no terminal), into ./dist/appstore
+#   ARCH=x86_64 Scripts/build-app.sh         for Intel Macs only (ARCH=arm64: Apple Silicon only; unset: this Mac's)
 #   UNIVERSAL=1 Scripts/build-app.sh         an arm64 + x86_64 binary
 #   STRIP=0 Scripts/build-app.sh             keep the symbols in the binary (otherwise they go to DiffCode.app.dSYM)
 #
@@ -68,6 +69,13 @@ fi
 if [ "${UNIVERSAL:-0}" = "1" ]; then
     swift build -c release --product "$PRODUCT" --arch arm64 --arch x86_64
     BIN_DIR="$(swift build -c release --product "$PRODUCT" --arch arm64 --arch x86_64 --show-bin-path)"
+elif [ -n "${ARCH:-}" ]; then
+    case "$ARCH" in
+        arm64|x86_64) ;;
+        *) echo "error: ARCH must be arm64 or x86_64" >&2; exit 1 ;;
+    esac
+    swift build -c release --product "$PRODUCT" --arch "$ARCH"
+    BIN_DIR="$(swift build -c release --product "$PRODUCT" --arch "$ARCH" --show-bin-path)"
 else
     swift build -c release --product "$PRODUCT"
     BIN_DIR="$(swift build -c release --show-bin-path)"
