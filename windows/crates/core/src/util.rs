@@ -56,16 +56,19 @@ fn fold(c: char) -> char {
     c.to_lowercase().next().unwrap_or(c)
 }
 
-/// The last component of a slash-separated repository path.
+/// The last component of a slash-separated repository path. A slash at the end is not part of the name: git
+/// gives a folder it does not look into (a repository inside this one) as "docs/handbook/".
 pub fn file_name(path: &str) -> &str {
+    let path = path.strip_suffix('/').unwrap_or(path);
     match path.rfind('/') {
         Some(i) => &path[i + 1..],
         None => path,
     }
 }
 
-/// Everything before the last slash of a repository path ("" for a top-level file).
+/// Everything before the last slash of a repository path ("" for a top-level file), a slash at the end apart.
 pub fn parent_dir(path: &str) -> &str {
+    let path = path.strip_suffix('/').unwrap_or(path);
     match path.rfind('/') {
         Some(i) => &path[..i],
         None => "",
@@ -217,6 +220,11 @@ mod tests {
     #[test]
     fn path_pieces() {
         assert_eq!(file_name("a/b/c.kt"), "c.kt");
+        // A repository inside this one, as git lists it.
+        assert_eq!(file_name("docs/handbook/"), "handbook");
+        assert_eq!(parent_dir("docs/handbook/"), "docs");
+        assert_eq!(file_name("handbook/"), "handbook");
+        assert_eq!(parent_dir("handbook/"), "");
         assert_eq!(parent_dir("a/b/c.kt"), "a/b");
         assert_eq!(parent_dir("c.kt"), "");
         assert_eq!(extension("a/B.KT"), "kt");
