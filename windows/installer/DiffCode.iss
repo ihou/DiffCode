@@ -1,5 +1,5 @@
 ; The Windows installer, built with Inno Setup 6 by .github/workflows/windows.yml:
-;   ISCC /DAppVersion=0.3.3 /DAppBuild=6 windows\installer\DiffCode.iss
+;   ISCC /DAppVersion=0.4.0 /DAppBuild=7 windows\installer\DiffCode.iss
 ; after, in windows\, `cargo build -p diffcode --release` and `python installer\notices.py target\THIRD-PARTY-NOTICES.txt`.
 ;
 ; It installs for the current user (no administrator prompt) into %LOCALAPPDATA%\Programs\DiffCode, with a Start

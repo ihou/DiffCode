@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>DiffCode 0.4.0</title>
+<style>
+  body { font: 13px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; margin: 12px 16px; }
+  h2 { font-size: 15px; margin: 0 0 6px; }
+  h3 { font-size: 13px; margin: 12px 0 4px; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin: 2px 0; }
+  kbd, code { font: 12px ui-monospace, Menlo, monospace; }
+  hr { border: none; border-top: 1px solid rgba(128, 128, 128, 0.35); margin: 14px 0; }
+</style>
+</head>
+<body>
+<h2>DiffCode 0.4.0</h2>
+
+<h3>新功能</h3>
+<ul>
+  <li><b>仓库里的仓库。</b>添加一个包含多个独立仓库的文件夹时，DiffCode 会把里面的每个仓库都加进来，不只是最外层那个。<code>.gitignore</code> 忽略的目录不会去找，但被忽略的文件夹如果本身是仓库，仍会加入。子模块和以前一样，跟随所在仓库。</li>
+  <li><b>关联工作树。</b>仓库的工作树（<code>git worktree</code>）会自动显示在它下面，各自带分支和改动数，删除后自动消失。DiffCode 只读取，不创建、不删除、不切换。</li>
+  <li><b>项目显示为树。</b>侧边栏显示仓库之间的包含关系。折叠一个仓库可以收起它下面的项目，折叠后的那一行仍会统计它们的改动。</li>
+  <li><b>刷新时重新查找。</b>在项目上右键选择「刷新」，会重新查找之后新增的仓库和工作树。</li>
+</ul>
+
+<hr>
+
+<h3>New</h3>
+<ul>
+  <li><b>Repositories inside a repository. </b>Add a folder that holds several independent repositories and DiffCode adds each of them, not just the outer one. What <code>.gitignore</code> ignores is not searched, though an ignored folder that is itself a repository is added. Submodules stay with their repository as before.</li>
+  <li><b>Linked work trees. </b>A repository’s work trees (<code>git worktree</code>) appear under it by themselves, each with its branch and changes, and go when they are removed. DiffCode only reads them: nothing is created, removed or switched.</li>
+  <li><b>Projects as a tree. </b>The sidebar shows which repository is inside which. Fold a repository to put away what is under it; the folded row still counts their changes.</li>
+  <li><b>Refresh finds new ones. </b>Right-click a project and choose Refresh to look again for repositories and work trees added since.</li>
+</ul>
+</body>
+</html>
