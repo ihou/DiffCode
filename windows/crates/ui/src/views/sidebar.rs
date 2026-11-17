@@ -4,6 +4,7 @@
 use super::components::{self, ViewState};
 use super::file_tree;
 use crate::app::project::ProjectId;
+use crate::app::project_tree;
 use crate::app::{App, MenuItem, PlatformRequest, Popup};
 use crate::core::lang::l;
 use crate::core::lf;
@@ -37,7 +38,7 @@ pub fn sidebar(app: &mut App, vs: &mut ViewState, ui: &mut Ui, platform: &mut dy
     let shows_tree = app.current_project().is_some() && !app.git_missing;
     if shows_tree {
         // The projects take the room they need, up to about a third; the tree gets everything else.
-        let h = projects_height(t.s(40.0), app.projects.len(), rect.h);
+        let h = projects_height(t.s(40.0), app.project_rows().len(), rect.h);
         let list = area.take_top(h.min(area.h));
         projects(app, vs, ui, list);
         ui.hline(area.x, area.y, area.w, t.hairline);
@@ -64,32 +65,51 @@ fn projects(app: &mut App, vs: &mut ViewState, ui: &mut Ui, rect: Rect) {
     let t = ui.theme;
     let row_h = t.s(40.0);
     let step = row_h + ROW_SPACING;
-    let content = app.projects.len() as f32 * step - ROW_SPACING + BOTTOM_PADDING;
+    let rows = app.project_rows();
+    // Room for the arrows only when something can be folded, so a plain list looks as it always did.
+    let nested = rows.iter().any(|r| r.has_children || r.depth > 0);
+    let content = rows.len() as f32 * step - ROW_SPACING + BOTTOM_PADDING;
     let scroll = vs.scroll(Id::new("projects"));
     ui.block(Id::new("projects-back"), rect);
     scroll_area(ui, Id::new("projects-scroll"), rect, content, scroll);
     let offset = scroll.offset;
-    let ids: Vec<ProjectId> = app.projects.iter().map(|p| p.id).collect();
+    let items: Vec<(ProjectId, project_tree::Row, Option<ProjectId>)> =
+        rows.iter().map(|r| (app.projects[r.index].id, *r, r.parent.map(|p| app.projects[p].id))).collect();
     ui.clipped(rect, |ui| {
-        for (i, id) in ids.into_iter().enumerate() {
+        for (i, (id, tree, parent)) in items.into_iter().enumerate() {
             let y = rect.y + i as f32 * step - offset;
             let row = Rect::new(rect.x + t.s(8.0), y, rect.w - t.s(16.0), row_h);
             if row.bottom() < rect.y || row.y > rect.bottom() {
                 continue;
             }
-            project_row(app, ui, id, row);
+            project_row(app, ui, id, row, tree, nested, parent);
         }
     });
 }
 
-fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect) {
+fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect, tree: project_tree::Row, nested: bool, parent: Option<ProjectId>) {
     let t = ui.theme;
     let selected = app.selected == Some(id);
+    let collapsed = app.is_collapsed(id);
+    let hidden = app.hidden_changes(id);
+    let parent_key = parent.and_then(|p| app.project(p)).map(|p| project_tree::key(&p.url));
     let Some(p) = app.project(id) else { return };
-    let name = p.name.clone();
-    let path = p.url.to_string_lossy().to_string();
+    let avatar_name = p.name.clone();
+    // Under its parent a repository goes by its path from there ("services/core").
+    let name = match &parent_key {
+        Some(parent) if project_tree::key(&p.url).starts_with(&(parent.clone() + "/")) => {
+            let full = p.url.to_string_lossy().replace('\\', "/");
+            full.trim_end_matches('/').chars().skip(parent.chars().count() + 1).collect::<String>()
+        }
+        _ => p.name.clone(),
+    };
+    let mut path = p.url.to_string_lossy().to_string();
     let error = p.error_message.clone();
-    let count = p.changes().len();
+    let count = p.changes().len() + hidden;
+    if hidden > 0 {
+        path.push('\n');
+        path.push_str(&lf!("{hidden} changes in the repositories inside", "子仓库里有 {hidden} 处改动"));
+    }
     let r = ui.interact(Id::new("project-row").with(id), row);
     let fill = if selected {
         t.selection
@@ -101,9 +121,27 @@ fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect) {
     if fill.a > 0.0 {
         ui.round(row, t.s(8.0), fill);
     }
+    // The arrow that folds the repositories inside, and the room each level takes.
+    let mut left = row.x + t.s(8.0);
+    let mut arrow_hit = false;
+    if nested {
+        let gutter = Rect::new(left + tree.depth as f32 * t.s(14.0) - t.s(5.0), row.y, t.s(16.0), row.h);
+        if tree.has_children {
+            let hit = ui.interact(Id::new("project-fold").with(id), gutter);
+            let s = t.s(10.0);
+            let icon = if collapsed { Icon::ChevronRight } else { Icon::ChevronDown };
+            ui.icon(icon, Rect::new(gutter.center().x - s / 2.0, gutter.center().y - s / 2.0, s, s), if hit.hovered { t.text } else { t.text3 });
+            ui.tooltip(&hit, &if collapsed { l("Show the repositories inside", "展开子仓库") } else { l("Hide the repositories inside", "折叠子仓库") });
+            arrow_hit = hit.hovered;
+            if hit.clicked {
+                app.toggle_collapsed(id);
+            }
+        }
+        left = gutter.right() + t.s(3.0);
+    }
     let avatar = t.s(24.0);
-    components::avatar(ui, Rect::new(row.x + t.s(8.0), row.center().y - avatar / 2.0, avatar, avatar), &name);
-    let text_x = row.x + t.s(8.0) + avatar + t.s(9.0);
+    components::avatar(ui, Rect::new(left, row.center().y - avatar / 2.0, avatar, avatar), &avatar_name);
+    let text_x = left + avatar + t.s(9.0);
     let mut right = row.right() - t.s(8.0);
 
     // What sits at the end of the row: a warning, or how many files changed.
@@ -140,11 +178,11 @@ fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect) {
     let label_hit = branch_label(app, ui, id, branch_rect);
 
     ui.tooltip(&r, &path);
-    if r.clicked && !label_hit {
+    if r.clicked && !label_hit && !arrow_hit {
         app.select(id);
     }
     if r.secondary {
-        project_menu(app, id, ui.mouse());
+        project_menu(app, id, ui.mouse(), tree.has_children);
     }
 }
 
@@ -226,22 +264,28 @@ fn branch_label(app: &mut App, ui: &mut Ui, id: ProjectId, rect: Rect) -> bool {
     r.hovered
 }
 
-fn project_menu(app: &mut App, id: ProjectId, at: Point) {
+fn project_menu(app: &mut App, id: ProjectId, at: Point, has_children: bool) {
     let Some(p) = app.project(id) else { return };
     let url = p.url.clone();
-    let index = app.projects.iter().position(|p| p.id == id).unwrap_or(0);
-    let last = app.projects.len().saturating_sub(1);
+    let (up, down) = (app.can_move_project(id, -1), app.can_move_project(id, 1));
+    let collapsed = app.is_collapsed(id);
     let path = url.to_string_lossy().to_string();
-    let items = vec![
+    let mut items = vec![
         MenuItem::new(l("Reveal in File Explorer", "在资源管理器中显示"), move |app| app.requests.push(PlatformRequest::Reveal(url))),
         MenuItem::new(l("Copy Path", "复制路径"), move |app| app.copy_text(path)),
         MenuItem::new(l("Refresh", "刷新"), move |app| app.refresh_and_discover(id)),
         MenuItem::separator(),
-        MenuItem::new(l("Move Up", "上移"), move |app| app.move_project(id, -1)).disabled(index == 0),
-        MenuItem::new(l("Move Down", "下移"), move |app| app.move_project(id, 1)).disabled(index == last),
+    ];
+    if has_children {
+        let title = if collapsed { l("Expand", "展开") } else { l("Collapse", "折叠") };
+        items.push(MenuItem::new(title, move |app| app.toggle_collapsed(id)));
+    }
+    items.extend([
+        MenuItem::new(l("Move Up", "上移"), move |app| app.move_project(id, -1)).disabled(!up),
+        MenuItem::new(l("Move Down", "下移"), move |app| app.move_project(id, 1)).disabled(!down),
         MenuItem::separator(),
         MenuItem::new(l("Remove from DiffCode", "从 DiffCode 中移除"), move |app| app.remove_project(id)),
-    ];
+    ]);
     app.open_menu(at, items);
 }
 

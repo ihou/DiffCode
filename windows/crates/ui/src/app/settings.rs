@@ -101,6 +101,8 @@ pub struct Settings {
     /// Projects in the sidebar, in order, and the one selected.
     pub projects: Vec<PathBuf>,
     pub selected_project: Option<PathBuf>,
+    /// The projects whose repositories inside are folded away in the sidebar.
+    pub collapsed: Vec<PathBuf>,
     /// The window's place: x, y, width, height in pixels, and whether maximised.
     pub window: Option<(i32, i32, i32, i32, bool)>,
     pub recent_actions: Vec<String>,
@@ -136,6 +138,7 @@ impl Default for Settings {
             follow_file: false,
             projects: Vec::new(),
             selected_project: None,
+            collapsed: Vec::new(),
             window: None,
             recent_actions: Vec::new(),
             check_updates: true,
@@ -158,6 +161,7 @@ impl Settings {
             let (k, v) = (k.trim(), v.trim());
             match k {
                 "project" => s.projects.push(PathBuf::from(v)),
+                "collapsed" => s.collapsed.push(PathBuf::from(v)),
                 "recentAction" => s.recent_actions.push(v.to_string()),
                 _ => {
                     map.insert(k, v);
@@ -255,6 +259,9 @@ impl Settings {
         }
         for p in &self.projects {
             put("project", p.display().to_string());
+        }
+        for p in &self.collapsed {
+            put("collapsed", p.display().to_string());
         }
         for a in &self.recent_actions {
             put("recentAction", a.clone());

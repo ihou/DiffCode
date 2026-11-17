@@ -17,6 +17,7 @@ pub mod history_edit_actions;
 pub mod jobs;
 pub mod partial;
 pub mod project;
+pub mod project_tree;
 pub mod search;
 pub mod settings;
 pub mod stash_actions;
@@ -406,6 +407,9 @@ impl App {
     pub fn persist_projects(&mut self) {
         self.settings.projects = self.projects.iter().map(|p| p.url.clone()).collect();
         self.settings.selected_project = self.current_project().map(|p| p.url.clone());
+        // Only what is still listed, so the setting does not grow with every folder ever collapsed.
+        let listed = self.project_keys();
+        self.settings.collapsed.retain(|c| listed.contains(&project_tree::key(c)));
         self.settings.save();
     }
 
@@ -626,18 +630,85 @@ impl App {
         self.persist_projects();
     }
 
+    // The projects as a tree.
+
+    fn project_keys(&self) -> Vec<String> {
+        self.projects.iter().map(|p| project_tree::key(&p.url)).collect()
+    }
+
+    fn collapsed_keys(&self) -> Vec<String> {
+        self.settings.collapsed.iter().map(|p| project_tree::key(p)).collect()
+    }
+
+    /// The sidebar's rows: a repository inside another one listed sits under it.
+    pub fn project_rows(&self) -> Vec<project_tree::Row> {
+        project_tree::rows(&self.project_keys(), &self.collapsed_keys())
+    }
+
+    pub fn is_collapsed(&self, id: ProjectId) -> bool {
+        self.project(id).is_some_and(|p| self.collapsed_keys().contains(&project_tree::key(&p.url)))
+    }
+
+    /// The projects next to this one under the same parent, in order (itself included).
+    fn siblings(&self, id: ProjectId) -> Vec<ProjectId> {
+        let parents = project_tree::parents(&self.project_keys());
+        let Some(index) = self.projects.iter().position(|p| p.id == id) else { return Vec::new() };
+        (0..self.projects.len()).filter(|i| parents[*i] == parents[index]).map(|i| self.projects[i].id).collect()
+    }
+
+    pub fn can_move_project(&self, id: ProjectId, delta: isize) -> bool {
+        let siblings = self.siblings(id);
+        siblings.iter().position(|s| *s == id).is_some_and(|p| {
+            let target = p as isize + delta;
+            target >= 0 && target < siblings.len() as isize
+        })
+    }
+
+    /// Up or down among the projects at its level; those inside it follow, being shown under it wherever it is.
     pub fn move_project(&mut self, id: ProjectId, delta: isize) {
-        let Some(index) = self.projects.iter().position(|p| p.id == id) else { return };
-        let target = index as isize + delta;
-        if target < 0 || target >= self.projects.len() as isize {
+        if !self.can_move_project(id, delta) {
             return;
         }
-        let p = self.projects.remove(index);
-        self.projects.insert(target as usize, p);
+        let siblings = self.siblings(id);
+        let position = siblings.iter().position(|s| *s == id).unwrap_or(0);
+        let other = siblings[(position as isize + delta) as usize];
+        let Some(from) = self.projects.iter().position(|p| p.id == id) else { return };
+        let p = self.projects.remove(from);
+        let to = self.projects.iter().position(|p| p.id == other).unwrap_or(0);
+        self.projects.insert(if delta < 0 { to } else { to + 1 }, p);
+        self.persist_projects();
+    }
+
+    /// The changes in the repositories folded away under a collapsed project, to count with its own.
+    pub fn hidden_changes(&self, id: ProjectId) -> usize {
+        if !self.is_collapsed(id) {
+            return 0;
+        }
+        let Some(index) = self.projects.iter().position(|p| p.id == id) else { return 0 };
+        project_tree::descendants(index, &self.project_keys()).into_iter().map(|i| self.projects[i].changes().len()).sum()
+    }
+
+    pub fn toggle_collapsed(&mut self, id: ProjectId) {
+        let Some(url) = self.project(id).map(|p| p.url.clone()) else { return };
+        let key = project_tree::key(&url);
+        if self.is_collapsed(id) {
+            self.settings.collapsed.retain(|c| project_tree::key(c) != key);
+        } else {
+            self.settings.collapsed.push(url);
+            // The selection would vanish with the rows: it moves to the project folded.
+            let below = key + "/";
+            if self.current_project().is_some_and(|p| project_tree::key(&p.url).starts_with(&below)) {
+                self.select(id);
+            }
+        }
         self.persist_projects();
     }
 
     pub fn select(&mut self, id: ProjectId) {
+        // Chosen from elsewhere (Quick Open, a new repository found): it must be in sight.
+        if let Some(key) = self.project(id).map(|p| project_tree::key(&p.url)) {
+            self.settings.collapsed.retain(|c| !key.starts_with(&(project_tree::key(c) + "/")));
+        }
         if self.selected != Some(id) {
             self.selected = Some(id);
             self.persist_projects();

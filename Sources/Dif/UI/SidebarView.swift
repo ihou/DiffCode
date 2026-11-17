@@ -21,7 +21,7 @@ struct SidebarView: View {
 
                 if let project = store.currentProject, !project.needsAccess, !store.gitMissing {
                     // The projects take the room they need, up to about a third; the tree gets everything else.
-                    projects.frame(height: Self.projectsHeight(count: store.projects.count, available: proxy.size.height))
+                    projects.frame(height: Self.projectsHeight(count: store.projectRows.count, available: proxy.size.height))
                     Rectangle().fill(Color.difHairline).frame(height: 1)
                     FileTreePanel(project: project)
                         .id(project.id)
@@ -41,9 +41,16 @@ struct SidebarView: View {
     private var projects: some View {
         ScrollView {
             LazyVStack(spacing: Self.rowSpacing) {
-                ForEach(store.projects) { project in
-                    ProjectRow(project: project, isSelected: project.id == store.selectedProjectID)
+                let rows = store.projectRows
+                // Room for the arrows only when something can be folded, so a plain list looks as it always did.
+                let nested = rows.contains { $0.hasChildren || $0.depth > 0 }
+                ForEach(rows, id: \.index) { row in
+                    let project = store.projects[row.index]
+                    ProjectRow(project: project, isSelected: project.id == store.selectedProjectID,
+                               depth: row.depth, hasChildren: row.hasChildren, nested: nested,
+                               parent: row.parent.map { store.projects[$0] })
                         .frame(height: Self.rowHeight)
+                        .id(project.id)
                 }
             }
             .padding(.horizontal, 8)
@@ -128,14 +135,48 @@ private struct BranchLabel: View {
 private struct ProjectRow: View {
     let project: Project
     var isSelected: Bool
+    var depth = 0
+    var hasChildren = false
+    /// Whether any project is inside another: then every row leaves room for the arrow.
+    var nested = false
+    var parent: Project?
     @Environment(AppStore.self) private var store
     @State private var hovering = false
 
+    /// Under its parent a repository goes by its path from there ("services/core").
+    private var title: String {
+        guard let parent, project.url.path.hasPrefix(parent.url.path + "/") else { return project.name }
+        return String(project.url.path.dropFirst(parent.url.path.count + 1))
+    }
+
     var body: some View {
+        let collapsed = store.collapsedProjects.contains(project.url.path)
+        let changes = project.changes.count + store.hiddenChanges(under: project)
         HStack(spacing: 9) {
+            if nested {
+                Group {
+                    if hasChildren {
+                        Button { store.toggleCollapsed(project) } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.ui(size: 9, weight: .semibold))
+                                .rotationEffect(.degrees(collapsed ? 0 : 90))
+                                .foregroundStyle(Color.difText3)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(collapsed ? L("Show the repositories inside", "展开子仓库") : L("Hide the repositories inside", "折叠子仓库"))
+                    } else {
+                        Color.clear
+                    }
+                }
+                .frame(width: UI.s(12))
+                .padding(.leading, CGFloat(depth) * UI.s(14) - 3)
+                .padding(.trailing, -5)
+            }
             ProjectAvatar(name: project.name)
             VStack(alignment: .leading, spacing: 1) {
-                Text(project.name)
+                Text(title)
                     .font(.ui(size: 13, weight: .medium))
                     .foregroundStyle(Color.difText)
                     .lineLimit(1)
@@ -155,8 +196,8 @@ private struct ProjectRow: View {
                     .font(.ui(size: 11))
                     .foregroundStyle(.orange)
                     .help(project.errorMessage ?? "")
-            } else if !project.changes.isEmpty {
-                Text("\(project.changes.count)")
+            } else if changes > 0 {
+                Text("\(changes)")
                     .font(.ui(size: 10.5, weight: .semibold, design: .rounded))
                     .foregroundStyle(isSelected ? Color.white : Color.difText2)
                     .padding(.horizontal, 6)
@@ -173,7 +214,10 @@ private struct ProjectRow: View {
         .contentShape(Rectangle())
         .onTapGesture { store.select(project) }
         .onHover { hovering = $0 }
-        .help(project.url.path)
+        .help(collapsed && changes > project.changes.count
+              ? project.url.path + "\n" + L("\(changes - project.changes.count) changes in the repositories inside",
+                                             "子仓库里有 \(changes - project.changes.count) 处改动")
+              : project.url.path)
         .contextMenu {
             Button(L("Reveal in Finder", "在 Finder 中显示")) { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }
             Button(L("Copy Path", "复制路径")) {
@@ -182,13 +226,12 @@ private struct ProjectRow: View {
             }
             Button(L("Refresh", "刷新")) { store.refreshAndDiscover(project) }
             Divider()
-            if let index = store.projects.firstIndex(where: { $0.id == project.id }) {
-                Button(L("Move Up", "上移")) { store.moveProjects(from: IndexSet(integer: index), to: index - 1) }
-                    .disabled(index == 0)
-                Button(L("Move Down", "下移")) { store.moveProjects(from: IndexSet(integer: index), to: index + 2) }
-                    .disabled(index == store.projects.count - 1)
-                Divider()
+            if hasChildren {
+                Button(collapsed ? L("Expand", "展开") : L("Collapse", "折叠")) { store.toggleCollapsed(project) }
             }
+            Button(L("Move Up", "上移")) { store.move(project, by: -1) }.disabled(!store.canMove(project, by: -1))
+            Button(L("Move Down", "下移")) { store.move(project, by: 1) }.disabled(!store.canMove(project, by: 1))
+            Divider()
             Button(L("Remove from \(appName)", "从 \(appName) 中移除"), role: .destructive) { store.remove(project) }
         }
     }

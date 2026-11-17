@@ -35,6 +35,8 @@ final class AppStore {
     @ObservationIgnored var branchLabelFrames: [UUID: CGRect] = [:]
 
     var projects: [Project] = []
+    /// The projects whose repositories inside are folded away in the sidebar, by path.
+    var collapsedProjects: Set<String> = []
     var selectedProjectID: UUID? { didSet { if selectedProjectID != oldValue { terminals.updatePolling() } } }
     var popup: Popup?
     var sidebarVisible = true
@@ -124,6 +126,7 @@ final class AppStore {
             guard FileManager.default.fileExists(atPath: path) else { continue }
             install(Project(url: URL(fileURLWithPath: path)))
         }
+        collapsedProjects = Set(defaults.stringArray(forKey: "collapsedProjects") ?? [])
         let last = defaults.string(forKey: "selectedProject")
         selectedProjectID = (projects.first { $0.url.path == last } ?? projects.first)?.id
         projects.forEach { $0.refresh() }
@@ -176,6 +179,8 @@ final class AppStore {
         let defaults = UserDefaults.standard
         defaults.set(projects.map(\.url.path), forKey: "projects")
         defaults.set(currentProject?.url.path, forKey: "selectedProject")
+        // Only what is still listed, so the setting does not grow with every folder ever collapsed.
+        defaults.set(projects.map(\.url.path).filter(collapsedProjects.contains), forKey: "collapsedProjects")
     }
 
     var isWindowVisible: Bool {
@@ -309,12 +314,58 @@ final class AppStore {
         persistProjects()
     }
 
-    func moveProjects(from source: IndexSet, to destination: Int) {
-        projects.move(fromOffsets: source, toOffset: destination)
+    // MARK: The projects as a tree
+
+    /// The sidebar's rows: a repository inside another one listed sits under it.
+    var projectRows: [ProjectTree.Row] {
+        ProjectTree.rows(paths: projects.map(\.url.path), collapsed: collapsedProjects)
+    }
+
+    /// The projects next to this one under the same parent, in order (itself included).
+    private func siblings(of project: Project) -> [Project] {
+        let parents = ProjectTree.parents(projects.map(\.url.path))
+        guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return [] }
+        return projects.indices.filter { parents[$0] == parents[index] }.map { projects[$0] }
+    }
+
+    func canMove(_ project: Project, by delta: Int) -> Bool {
+        let siblings = siblings(of: project)
+        guard let position = siblings.firstIndex(where: { $0.id == project.id }) else { return false }
+        return siblings.indices.contains(position + delta)
+    }
+
+    /// Up or down among the projects at its level; those inside it follow, being shown under it wherever it is.
+    func move(_ project: Project, by delta: Int) {
+        let siblings = siblings(of: project)
+        guard let position = siblings.firstIndex(where: { $0.id == project.id }), siblings.indices.contains(position + delta),
+              let from = projects.firstIndex(where: { $0.id == project.id }) else { return }
+        let other = siblings[position + delta]
+        projects.remove(at: from)
+        guard let to = projects.firstIndex(where: { $0.id == other.id }) else { return }
+        projects.insert(project, at: delta < 0 ? to : to + 1)
+        persistProjects()
+    }
+
+    /// The changes in the repositories folded away under a collapsed project, to count with its own.
+    func hiddenChanges(under project: Project) -> Int {
+        guard collapsedProjects.contains(project.url.path), let index = projects.firstIndex(where: { $0.id == project.id }) else { return 0 }
+        return ProjectTree.descendants(of: index, in: projects.map(\.url.path)).reduce(0) { $0 + projects[$1].changes.count }
+    }
+
+    func toggleCollapsed(_ project: Project) {
+        let path = project.url.path
+        if collapsedProjects.remove(path) == nil {
+            collapsedProjects.insert(path)
+            // The selection would vanish with the rows: it moves to the project folded.
+            if let current = currentProject, current.url.path.hasPrefix(path + "/") { select(project) }
+        }
         persistProjects()
     }
 
     func select(_ project: Project) {
+        // Chosen from elsewhere (Quick Open, a new repository found): it must be in sight.
+        let folded = collapsedProjects.filter { project.url.path.hasPrefix($0 + "/") }
+        if !folded.isEmpty { collapsedProjects.subtract(folded) }
         if selectedProjectID != project.id {
             selectedProjectID = project.id
             persistProjects()
