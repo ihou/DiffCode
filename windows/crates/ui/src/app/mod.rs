@@ -568,6 +568,11 @@ impl App {
                     }
                     landed = landed.or(Some(id));
                 }
+                // A work tree just added goes under its repository now, not at that one's next look.
+                let mains: Vec<ProjectId> = app.projects.iter().filter(|p| p.worktree_of.is_none()).map(|p| p.id).collect();
+                for main in mains {
+                    app.sync_worktrees(main, true);
+                }
                 if let Some(id) = landed {
                     app.select(id);
                 } else if rejected > 0 {
@@ -746,7 +751,7 @@ impl App {
         );
     }
 
-    /// A work tree git lists, asleep until its row is known to be in sight.
+    /// A work tree git lists: awake for its first status; `update_dormancy` puts it to sleep when out of sight.
     fn install_dormant(&mut self, url: PathBuf, owner: ProjectId) -> ProjectId {
         let id = self.next_project_id;
         self.next_project_id += 1;
@@ -756,7 +761,9 @@ impl App {
         }
         project.worktree_of = Some(owner);
         project.is_derived = true;
-        project.is_dormant = true;
+        // Its status once, so that a folded repository counts its changes; then asleep unless in sight.
+        project.start_watching();
+        project.refresh();
         self.projects.push(project);
         id
     }

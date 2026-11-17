@@ -44,8 +44,8 @@ struct SidebarView: View {
                 let rows = store.projectRows
                 // Room for the arrows only when something can be folded, so a plain list looks as it always did.
                 let nested = rows.contains { $0.hasChildren || $0.depth > 0 }
-                ForEach(rows, id: \.index) { row in
-                    let project = store.projects[row.index]
+                ForEach(rows.map { ProjectRowItem(project: store.projects[$0.index], row: $0) }) { item in
+                    let (project, row) = (item.project, item.row)
                     ProjectRow(project: project, isSelected: project.id == store.selectedProjectID,
                                depth: row.depth, hasChildren: row.hasChildren, nested: nested,
                                parent: row.parent.map { store.projects[$0] })
@@ -130,6 +130,13 @@ private struct BranchLabel: View {
         frame = value
         store.branchLabelFrames[project.id] = value
     }
+}
+
+/// A row of the projects' tree, known by its project whatever its place.
+private struct ProjectRowItem: Identifiable {
+    let project: Project
+    let row: ProjectTree.Row
+    var id: UUID { project.id }
 }
 
 private struct ProjectRow: View {

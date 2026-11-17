@@ -266,6 +266,8 @@ final class AppStore {
                     landed = landed ?? project
                 }
             }
+            // A work tree just added goes under its repository now, not at that one's next look.
+            for project in self.projects where project.worktreeOf == nil { self.syncWorktrees(of: project, force: true) }
             if let landed {
                 self.select(landed)
             } else if rejected > 0 {
@@ -448,9 +450,9 @@ final class AppStore {
                 let worktree = Project(url: URL(fileURLWithPath: entry.path))
                 worktree.worktreeOf = main.id
                 worktree.isDerived = true
-                // Asleep until its row is known to be in sight.
-                worktree.isDormant = true
                 self.install(worktree)
+                // Its status once, so that a folded repository counts its changes; then asleep unless in sight.
+                worktree.refresh()
                 if let awaited = self.awaitedSelection, real(awaited) == real(entry.path) {
                     self.awaitedSelection = nil
                     self.select(worktree)
