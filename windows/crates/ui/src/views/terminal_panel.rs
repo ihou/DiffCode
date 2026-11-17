@@ -423,7 +423,7 @@ fn pane_body(app: &mut App, ui: &mut Ui, platform: &mut dyn Platform, body: Rect
     let palette = Palette::new(t.dark);
     ui.fill(body, Color::hex(palette.background));
     let inner = body.inset_by(10.0, 4.0, 4.0, 4.0);
-    let font = Font::mono(app.settings.terminal_font_size);
+    let font = Font::terminal(app.settings.terminal_font_size);
     let cell = cell_size(ui, font);
     let columns = ((inner.w / cell.w).floor() as usize).max(2);
     let lines = ((inner.h / cell.h).floor() as usize).max(1);

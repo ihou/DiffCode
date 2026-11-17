@@ -65,6 +65,11 @@ pub trait Platform {
         let _ = pixels;
         None
     }
+    /// The default monospace face, and the installed families whose characters all share one width (the code view
+    /// and the terminal put characters in columns), sorted, for the font settings.
+    fn monospace_families(&self) -> (String, Vec<String>) {
+        (String::new(), Vec::new())
+    }
     /// Starts dragging files out of the window (a copy, never a move), while the button that started it is held.
     fn drag_files(&mut self, paths: Vec<PathBuf>) {
         let _ = paths;

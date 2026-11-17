@@ -4,6 +4,8 @@ use diffcode_core::diff::HunkKind;
 use diffcode_core::git::ChangeKind;
 use diffcode_core::syntax::TokenKind;
 
+use std::sync::Arc;
+
 use crate::geom::Color;
 use crate::paint::{Font, Weight};
 
@@ -152,6 +154,9 @@ impl CanvasColors {
 #[derive(Clone, Debug)]
 pub struct Theme {
     pub dark: bool,
+    /// Font families picked in Settings for code and for terminals; None: the default monospace face.
+    pub code_family: Option<Arc<str>>,
+    pub terminal_family: Option<Arc<str>>,
     /// Interface font size / 13: lengths written for the default size grow with it.
     pub scale: f32,
     pub code_size: f32,
@@ -191,6 +196,8 @@ impl Theme {
         };
         Theme {
             dark,
+            code_family: None,
+            terminal_family: None,
             scale: ui_size / BASE_UI_SIZE,
             code_size,
             window: d(0xFFFFFF, 0x1E1F22),

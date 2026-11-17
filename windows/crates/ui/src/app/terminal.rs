@@ -312,6 +312,14 @@ impl App {
         self.terminals.last_active.remove(&project);
     }
 
+    /// A font family picked in Settings for terminals; None puts back the default face.
+    pub fn choose_terminal_font(&mut self, family: Option<String>) {
+        if family != self.settings.terminal_font {
+            self.settings.terminal_font = family;
+            self.settings.save();
+        }
+    }
+
     pub fn change_terminal_font_size(&mut self, delta: f32) {
         let (lo, hi) = super::settings::TERMINAL_FONT_RANGE;
         let size = (self.settings.terminal_font_size + delta).clamp(lo, hi);

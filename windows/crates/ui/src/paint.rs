@@ -15,8 +15,10 @@ use crate::geom::{Color, Point, Rect, Size};
 pub enum FontKind {
     /// The interface face (Segoe UI on Windows).
     Ui,
-    /// The code face (Cascadia Mono / Consolas on Windows).
+    /// The code face: the family picked in Settings, else Cascadia Mono / Consolas on Windows.
     Mono,
+    /// The terminal face: the family picked in Settings for terminals, else the default code face.
+    Terminal,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -54,6 +56,10 @@ impl Font {
 
     pub const fn mono(size: f32) -> Font {
         Font { kind: FontKind::Mono, size, weight: Weight::Regular, italic: false }
+    }
+
+    pub const fn terminal(size: f32) -> Font {
+        Font { kind: FontKind::Terminal, size, weight: Weight::Regular, italic: false }
     }
 
     pub const fn weight(self, weight: Weight) -> Font {
@@ -274,6 +280,12 @@ pub enum CursorIcon {
 pub trait Backend {
     fn layout(&self, request: &TextRequest) -> Rc<dyn TextLayout>;
     fn metrics(&self, font: Font) -> FontMetrics;
+    /// The families picked in Settings for code and for terminals (None, or one not installed: the default
+    /// monospace face). Returns whether that changed what the faces are, so layouts made before are thrown away.
+    fn set_families(&self, code: Option<&str>, terminal: Option<&str>) -> bool {
+        let _ = (code, terminal);
+        false
+    }
     /// Pixel size of an image, or None when it cannot be read.
     fn image_size(&self, image: &ImageSource) -> Option<Size>;
 }

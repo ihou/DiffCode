@@ -50,6 +50,68 @@ fn u16_index(text: &str, byte: usize) -> usize {
 
 // MARK: - Text
 
+/// Whether the system has a font family by this name.
+fn has_family(collection: Option<&IDWriteFontCollection>, name: &str) -> bool {
+    let Some(c) = collection else { return false };
+    let mut index = 0;
+    let mut exists = BOOL(0);
+    unsafe { c.FindFamilyName(&HSTRING::from(name), &mut index, &mut exists).is_ok() && exists.as_bool() }
+}
+
+/// The monospace face DiffCode draws code and terminals in unless Settings picks another.
+fn default_mono(collection: Option<&IDWriteFontCollection>) -> &'static str {
+    ["Cascadia Mono", "Consolas", "Courier New"].into_iter().find(|n| has_family(collection, n)).unwrap_or("Consolas")
+}
+
+/// The default monospace face, and the installed families whose regular face is monospaced, by name, for the font
+/// settings.
+pub fn monospace_families() -> (String, Vec<String>) {
+    unsafe {
+        let Ok(dwrite) = DWriteCreateFactory::<IDWriteFactory>(DWRITE_FACTORY_TYPE_SHARED) else {
+            return ("Consolas".into(), Vec::new());
+        };
+        let mut collection = None;
+        let _ = dwrite.GetSystemFontCollection(&mut collection, true);
+        let default = default_mono(collection.as_ref()).to_string();
+        let Some(collection) = collection else { return (default, Vec::new()) };
+        let mut names = Vec::new();
+        for i in 0..collection.GetFontFamilyCount() {
+            let Ok(family) = collection.GetFontFamily(i) else { continue };
+            let Ok(font) = family.GetFirstMatchingFont(DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL)
+            else {
+                continue;
+            };
+            // Symbol faces (Wingdings, the icon fonts) have no letters to draw code in.
+            let mono = font.cast::<IDWriteFont1>().is_ok_and(|f| f.IsMonospacedFont().as_bool());
+            if !mono || font.IsSymbolFont().as_bool() {
+                continue;
+            }
+            if let Some(name) = family.GetFamilyNames().ok().and_then(|n| english_name(&n)) {
+                names.push(name);
+            }
+        }
+        names.sort_by_key(|n| n.to_lowercase());
+        names.dedup();
+        (default, names)
+    }
+}
+
+/// A family's English name (what Settings stores and DirectWrite finds), else the first it has.
+fn english_name(names: &IDWriteLocalizedStrings) -> Option<String> {
+    unsafe {
+        let mut index = 0;
+        let mut exists = BOOL(0);
+        let _ = names.FindLocaleName(&HSTRING::from("en-us"), &mut index, &mut exists);
+        if !exists.as_bool() {
+            index = 0;
+        }
+        let len = names.GetStringLength(index).ok()? as usize;
+        let mut buf = vec![0u16; len + 1];
+        names.GetString(index, &mut buf).ok()?;
+        Some(String::from_utf16_lossy(&buf[..len]))
+    }
+}
+
 /// A decoded image, with the bytes its stream reads from.
 type Decoded = (IWICFormatConverter, Arc<Vec<u8>>);
 
@@ -59,7 +121,12 @@ pub struct DxBackend {
     wic: Option<IWICImagingFactory>,
     fallback: Option<IDWriteFontFallback>,
     ui_family: HSTRING,
-    mono_family: HSTRING,
+    /// The monospace face used unless Settings picks another (Cascadia Mono, else Consolas).
+    default_mono: HSTRING,
+    /// The faces code and terminals are drawn in now, and the names Settings asked for, as last given.
+    code_family: RefCell<HSTRING>,
+    terminal_family: RefCell<HSTRING>,
+    picked: RefCell<(Option<String>, Option<String>)>,
     formats: RefCell<HashMap<Font, IDWriteTextFormat>>,
     metrics: RefCell<HashMap<Font, FontMetrics>>,
     signs: RefCell<HashMap<Font, IDWriteInlineObject>>,
@@ -76,14 +143,8 @@ impl DxBackend {
                 CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER).ok();
             let mut collection = None;
             dwrite.GetSystemFontCollection(&mut collection, false)?;
-            let has = |name: &str| -> bool {
-                let Some(c) = &collection else { return false };
-                let mut index = 0;
-                let mut exists = BOOL(0);
-                c.FindFamilyName(&HSTRING::from(name), &mut index, &mut exists).is_ok() && exists.as_bool()
-            };
-            let ui_family = if has("Segoe UI Variable Text") { "Segoe UI Variable Text" } else { "Segoe UI" };
-            let mono_family = ["Cascadia Mono", "Consolas", "Courier New"].into_iter().find(|n| has(n)).unwrap_or("Consolas");
+            let ui_family = if has_family(collection.as_ref(), "Segoe UI Variable Text") { "Segoe UI Variable Text" } else { "Segoe UI" };
+            let mono = default_mono(collection.as_ref());
             let fallback = Self::make_fallback(&dwrite).ok();
             Ok(DxBackend {
                 d2d,
@@ -91,7 +152,10 @@ impl DxBackend {
                 wic,
                 fallback,
                 ui_family: HSTRING::from(ui_family),
-                mono_family: HSTRING::from(mono_family),
+                default_mono: HSTRING::from(mono),
+                code_family: RefCell::new(HSTRING::from(mono)),
+                terminal_family: RefCell::new(HSTRING::from(mono)),
+                picked: RefCell::new((None, None)),
                 formats: RefCell::new(HashMap::new()),
                 metrics: RefCell::new(HashMap::new()),
                 signs: RefCell::new(HashMap::new()),
@@ -125,18 +189,24 @@ impl DxBackend {
         }
     }
 
+    /// The family a kind of font is drawn in now.
+    fn family(&self, kind: FontKind) -> HSTRING {
+        match kind {
+            FontKind::Ui => self.ui_family.clone(),
+            FontKind::Mono => self.code_family.borrow().clone(),
+            FontKind::Terminal => self.terminal_family.borrow().clone(),
+        }
+    }
+
     fn format(&self, font: Font) -> IDWriteTextFormat {
         if let Some(f) = self.formats.borrow().get(&font) {
             return f.clone();
         }
-        let family = match font.kind {
-            FontKind::Ui => &self.ui_family,
-            FontKind::Mono => &self.mono_family,
-        };
+        let family = self.family(font.kind);
         let format = unsafe {
             self.dwrite
                 .CreateTextFormat(
-                    family,
+                    &family,
                     None,
                     DWRITE_FONT_WEIGHT(font.weight.value() as i32),
                     if font.italic { DWRITE_FONT_STYLE_ITALIC } else { DWRITE_FONT_STYLE_NORMAL },
@@ -377,6 +447,35 @@ impl TextLayout for DwLayout {
 }
 
 impl Backend for DxBackend {
+    fn set_families(&self, code: Option<&str>, terminal: Option<&str>) -> bool {
+        {
+            let picked = self.picked.borrow();
+            if picked.0.as_deref() == code && picked.1.as_deref() == terminal {
+                return false;
+            }
+        }
+        *self.picked.borrow_mut() = (code.map(String::from), terminal.map(String::from));
+        // Looked up afresh, so a font installed since DiffCode started counts.
+        let collection = unsafe {
+            let mut c = None;
+            self.dwrite.GetSystemFontCollection(&mut c, true).ok().and(c)
+        };
+        let resolve = |name: Option<&str>| match name {
+            Some(n) if has_family(collection.as_ref(), n) => HSTRING::from(n),
+            _ => self.default_mono.clone(),
+        };
+        let (code, terminal) = (resolve(code), resolve(terminal));
+        if *self.code_family.borrow() == code && *self.terminal_family.borrow() == terminal {
+            return false;
+        }
+        *self.code_family.borrow_mut() = code;
+        *self.terminal_family.borrow_mut() = terminal;
+        self.formats.borrow_mut().retain(|f, _| f.kind == FontKind::Ui);
+        self.metrics.borrow_mut().retain(|f, _| f.kind == FontKind::Ui);
+        self.signs.borrow_mut().retain(|f, _| f.kind == FontKind::Ui);
+        true
+    }
+
     fn layout(&self, req: &TextRequest) -> Rc<dyn TextLayout> {
         let style = &req.style;
         let original: &str = &req.text;
@@ -486,13 +585,10 @@ impl Backend for DxBackend {
             let mut ascent = font.size * 0.92;
             let mut descent = font.size * 0.23;
             if let Ok(collection) = format.GetFontCollection() {
-                let family = match font.kind {
-                    FontKind::Ui => &self.ui_family,
-                    FontKind::Mono => &self.mono_family,
-                };
+                let family = self.family(font.kind);
                 let mut index = 0;
                 let mut exists = BOOL(0);
-                if collection.FindFamilyName(family, &mut index, &mut exists).is_ok() && exists.as_bool() {
+                if collection.FindFamilyName(&family, &mut index, &mut exists).is_ok() && exists.as_bool() {
                     if let Ok(f) = collection.GetFontFamily(index).and_then(|fam| {
                         fam.GetFirstMatchingFont(DWRITE_FONT_WEIGHT(font.weight.value() as i32), DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL)
                     }) {

@@ -101,6 +101,9 @@ final class Settings {
     /// Size of interface text (lists, headers, popups). Everything in the chrome scales from this.
     var uiFontSize: Double
     var terminalFontSize: Double
+    /// Font families picked for code and for terminals; nil is the default face (see `MonospaceFonts`).
+    var codeFontFamily: String?
+    var terminalFontFamily: String?
     var unified: Bool
     var ignoreWhitespace: Bool
     var flatList: Bool
@@ -121,6 +124,8 @@ final class Settings {
         uiFontSize = min(Self.uiFontRange.upperBound, max(Self.uiFontRange.lowerBound, defaults.object(forKey: "uiFontSize") as? Double ?? 13))
         terminalFontSize = min(Self.terminalFontRange.upperBound,
                                max(Self.terminalFontRange.lowerBound, defaults.object(forKey: "terminalFontSize") as? Double ?? 12))
+        codeFontFamily = defaults.string(forKey: "codeFontFamily").flatMap { $0.isEmpty ? nil : $0 }
+        terminalFontFamily = defaults.string(forKey: "terminalFontFamily").flatMap { $0.isEmpty ? nil : $0 }
         unified = defaults.bool(forKey: "unified")
         ignoreWhitespace = defaults.bool(forKey: "ignoreWhitespace")
         flatList = defaults.bool(forKey: "flatList")
@@ -138,6 +143,8 @@ final class Settings {
         defaults.set(fontSize, forKey: "fontSize")
         defaults.set(uiFontSize, forKey: "uiFontSize")
         defaults.set(terminalFontSize, forKey: "terminalFontSize")
+        defaults.set(codeFontFamily, forKey: "codeFontFamily")  // nil removes the key
+        defaults.set(terminalFontFamily, forKey: "terminalFontFamily")
         defaults.set(unified, forKey: "unified")
         defaults.set(ignoreWhitespace, forKey: "ignoreWhitespace")
         defaults.set(flatList, forKey: "flatList")

@@ -435,7 +435,7 @@ final class FindInPathModel {
 
     func attachPreview(_ container: CodeScrollContainer) {
         previewContainer = container
-        container.canvas.codeFont = CodeFont(size: store?.settings.fontSize ?? 12)
+        container.canvas.codeFont = CodeFont.current(store?.settings ?? .shared)
         container.show(previewDocument, mode: .single, preserveScroll: false)
         positionPreview()
     }

@@ -6,12 +6,12 @@ use super::{dialog, git_graph};
 use crate::app::commands::{commands, Group};
 use crate::app::search::{QuickItem, QuickOpenMode};
 use crate::app::settings::{Appearance, Language};
-use crate::app::{ids, App, Popup};
+use crate::app::{ids, App, MenuItem, Popup};
 use crate::core::history::RefKind;
 use crate::core::lang::l;
 use crate::core::lf;
 use crate::core::util::{file_name, relative_text};
-use crate::geom::{Color, Rect, Size};
+use crate::geom::{Color, Point, Rect, Size};
 use crate::icons::Icon;
 use crate::input::{Key, Modifiers};
 use crate::paint::{ColorRun, Overflow, TextRequest, TextStyle, Weight};
@@ -50,7 +50,7 @@ pub fn popups(app: &mut App, vs: &mut ViewState, ui: &mut Ui, platform: &mut dyn
                     Popup::FindInPath => find_in_path(app, ui, platform, room),
                     Popup::GoToLine => go_to_line(app, ui, platform, room),
                     Popup::Keymap => keymap(app, vs, ui, platform, room),
-                    Popup::Settings => settings(app, ui, room),
+                    Popup::Settings => settings(app, ui, platform, room),
                     _ => {}
                 }
             });
@@ -793,11 +793,14 @@ fn left_empty(filter: &str, content: f32, pad: f32) -> bool {
 
 // MARK: - Settings
 
-fn settings(app: &mut App, ui: &mut Ui, room: Rect) {
+fn settings(app: &mut App, ui: &mut Ui, platform: &mut dyn Platform, room: Rect) {
     let t = ui.theme;
     let restart = app.language_needs_restart();
     let updates = app.updates_supported();
-    let rows = if app.has_terminal() { 6.0 } else { 5.0 } + if updates { 1.0 } else { 0.0 };
+    if app.font_choices.is_none() {
+        app.font_choices = Some(platform.monospace_families());
+    }
+    let rows = if app.has_terminal() { 8.0 } else { 6.0 } + if updates { 1.0 } else { 0.0 };
     let h = t.s(48.0) + 1.0 + t.s(20.0) * 2.0 + rows * t.s(28.0) + (rows - 1.0) * t.s(16.0)
         + if restart { t.s(32.0) } else { 0.0 }
         + if updates { t.s(32.0) } else { 0.0 };
@@ -859,6 +862,12 @@ fn settings(app: &mut App, ui: &mut Ui, room: Rect) {
 
     }
 
+    let r = row(ui, &mut y, &l("Code font", "代码字体"));
+    let picked = app.settings.code_font.clone();
+    if let Some(at) = font_button(ui, Id::new("set-code-font"), Rect::new(r.right() - control_w, r.y, control_w, r.h), app.font_choices.as_ref(), picked.as_deref()) {
+        let items = font_menu(app.font_choices.as_ref(), picked.as_deref(), App::choose_code_font);
+        app.open_choice_menu(at, items);
+    }
     let r = row(ui, &mut y, &l("Code font size", "代码字号"));
     if let Some(d) = stepper(ui, Id::new("set-code"), r, app.settings.font_size, "Ctrl+Shift+,", "Ctrl+Shift+.") {
         app.change_code_font_size(d);
@@ -868,6 +877,12 @@ fn settings(app: &mut App, ui: &mut Ui, room: Rect) {
         app.change_interface_font_size(d);
     }
     if app.has_terminal() {
+        let r = row(ui, &mut y, &l("Terminal font", "终端字体"));
+        let picked = app.settings.terminal_font.clone();
+        if let Some(at) = font_button(ui, Id::new("set-terminal-font"), Rect::new(r.right() - control_w, r.y, control_w, r.h), app.font_choices.as_ref(), picked.as_deref()) {
+            let items = font_menu(app.font_choices.as_ref(), picked.as_deref(), App::choose_terminal_font);
+            app.open_choice_menu(at, items);
+        }
         let r = row(ui, &mut y, &l("Terminal font size", "终端字号"));
         if let Some(d) = stepper(ui, Id::new("set-terminal"), r, app.settings.terminal_font_size, &l("Smaller", "减小"), &l("Larger", "增大")) {
             app.change_terminal_font_size(d);
@@ -933,6 +948,52 @@ fn settings(app: &mut App, ui: &mut Ui, room: Rect) {
     }
 }
 
+/// The default monospace face and the installed ones (`App::font_choices`).
+type FontChoices = (String, Vec<String>);
+
+/// What a font setting shows: the family picked, marked when it is no longer installed, or "Default (…)".
+fn font_title(choices: Option<&FontChoices>, picked: Option<&str>) -> String {
+    match picked {
+        None => match choices.map(|(default, _)| default.as_str()).filter(|d| !d.is_empty()) {
+            Some(default) => lf!("Default ({default})", "默认（{default}）"),
+            None => l("Default", "默认"),
+        },
+        Some(name) if choices.is_some_and(|(_, list)| !list.is_empty() && !list.iter().any(|f| f == name)) => {
+            lf!("{name} (not installed)", "{name}（未安装）")
+        }
+        Some(name) => name.to_string(),
+    }
+}
+
+/// A button that drops down the list of fonts. Returns where the menu opens, when clicked.
+fn font_button(ui: &mut Ui, id: Id, rect: Rect, choices: Option<&FontChoices>, picked: Option<&str>) -> Option<Point> {
+    let t = ui.theme;
+    let rect = Rect::new(rect.x, rect.center().y - t.s(12.0), rect.w, t.s(24.0));
+    let hit = ui.interact(id, rect);
+    ui.round(rect, t.s(6.0), if hit.hovered { t.hover } else { t.text.alpha(0.08) });
+    let chevron = t.s(12.0);
+    let text = Rect::new(rect.x + t.s(10.0), rect.y, rect.w - t.s(24.0) - chevron, rect.h);
+    ui.label_with(text, &font_title(choices, picked), t.font(11.5), t.text, Align::Left, Overflow::Ellipsis);
+    ui.icon(Icon::ChevronDown, Rect::new(rect.right() - t.s(10.0) - chevron, rect.center().y - chevron / 2.0, chevron, chevron), t.text2);
+    hit.clicked.then(|| Point::new(rect.x, rect.bottom() + t.s(4.0)))
+}
+
+/// "Default" and the installed monospace families, the one in use ticked. A family picked once and uninstalled since
+/// stays at the end, marked, so it can be seen and changed; the code falls back to the default face meanwhile.
+fn font_menu(choices: Option<&FontChoices>, picked: Option<&str>, choose: fn(&mut App, Option<String>)) -> Vec<MenuItem> {
+    let mut items = vec![MenuItem::new(font_title(choices, None), move |app| choose(app, None)).checked(picked.is_none())];
+    let list = choices.map(|(_, list)| list.as_slice()).unwrap_or_default();
+    let missing = picked.filter(|p| !list.iter().any(|f| f == p));
+    if !list.is_empty() || missing.is_some() {
+        items.push(MenuItem::separator());
+    }
+    for name in list.iter().map(String::as_str).chain(missing) {
+        let family = name.to_string();
+        items.push(MenuItem::new(font_title(choices, Some(name)), move |app| choose(app, Some(family))).checked(picked == Some(name)));
+    }
+    items
+}
+
 /// A segmented control. Returns the segment clicked.
 fn segmented(ui: &mut Ui, id: Id, rect: Rect, titles: &[String], current: usize) -> Option<usize> {
     let t = ui.theme;
@@ -974,4 +1035,44 @@ fn stepper(ui: &mut Ui, id: Id, row: Rect, value: f32, down: &str, up: &str) -> 
         out = Some(1.0);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn choices() -> FontChoices {
+        ("Cascadia Mono".into(), vec!["Cascadia Mono".into(), "Consolas".into(), "MesloLGS NF".into()])
+    }
+
+    fn noop(_: &mut App, _: Option<String>) {}
+
+    #[test]
+    fn names_the_default_face() {
+        assert!(font_title(Some(&choices()), None).contains("Cascadia Mono"));
+        assert_eq!(font_title(Some(&choices()), Some("MesloLGS NF")), "MesloLGS NF");
+        // Before the list is read, a picked name is shown as it is.
+        assert_eq!(font_title(None, Some("MesloLGS NF")), "MesloLGS NF");
+    }
+
+    #[test]
+    fn lists_the_fonts_with_the_pick_ticked() {
+        let items = font_menu(Some(&choices()), Some("Consolas"), noop);
+        let titles: Vec<&str> = items.iter().map(|i| i.title.as_str()).collect();
+        assert_eq!(titles[2..], ["Cascadia Mono", "Consolas", "MesloLGS NF"]);
+        assert!(items[1].separator);
+        let ticked: Vec<usize> = items.iter().enumerate().filter(|(_, i)| i.checked).map(|(n, _)| n).collect();
+        assert_eq!(ticked, [3]);
+        assert!(font_menu(Some(&choices()), None, noop)[0].checked);
+    }
+
+    /// A family picked once and uninstalled since stays in the menu, marked and ticked, so it can be changed.
+    #[test]
+    fn keeps_an_uninstalled_pick_at_the_end() {
+        let items = font_menu(Some(&choices()), Some("Fira Code"), noop);
+        let last = items.last().unwrap();
+        assert!(last.checked && last.title.starts_with("Fira Code") && last.title != "Fira Code");
+        assert_eq!(items.iter().filter(|i| i.checked).count(), 1);
+        assert_eq!(font_title(Some(&choices()), Some("Fira Code")), last.title);
+    }
 }

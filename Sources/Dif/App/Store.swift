@@ -604,7 +604,23 @@ final class AppStore {
         guard size != settings.terminalFontSize else { return }
         settings.terminalFontSize = size
         settings.save()
-        terminals.applyFont(size: size)
+        terminals.applyFont(size: size, family: settings.terminalFontFamily)
+    }
+
+    /// A font family picked in Settings for code; nil puts back the default face.
+    func chooseCodeFont(_ family: String?) {
+        guard family != settings.codeFontFamily else { return }
+        settings.codeFontFamily = family
+        settings.save()
+        viewer.applyCodeFont()
+    }
+
+    /// A font family picked in Settings for terminals; nil puts back the default face.
+    func chooseTerminalFont(_ family: String?) {
+        guard family != settings.terminalFontFamily else { return }
+        settings.terminalFontFamily = family
+        settings.save()
+        terminals.applyFont(size: settings.terminalFontSize, family: family)
     }
 
     func toggleSidebar() {

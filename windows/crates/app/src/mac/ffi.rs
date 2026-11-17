@@ -178,6 +178,8 @@ extern "C" {
     pub fn CTFontCreateWithName(name: CFTypeRef, size: CGFloat, matrix: *const c_void) -> CFTypeRef;
     pub fn CTFontCreateUIFontForLanguage(kind: u32, size: CGFloat, lang: CFTypeRef) -> CFTypeRef;
     pub fn CTFontCopyFamilyName(font: CFTypeRef) -> CFTypeRef;
+    pub fn CTFontGetSymbolicTraits(font: CFTypeRef) -> u32;
+    pub fn CTFontManagerCopyAvailableFontFamilyNames() -> CFTypeRef;
     pub fn CTFontDescriptorCreateWithAttributes(attrs: CFTypeRef) -> CFTypeRef;
     pub fn CTFontCreateCopyWithAttributes(font: CFTypeRef, size: CGFloat, matrix: *const c_void, desc: CFTypeRef) -> CFTypeRef;
     pub fn CTFontCreateCopyWithSymbolicTraits(

@@ -242,11 +242,11 @@ final class TerminalSession: Identifiable {
     @ObservationIgnored private var pty: PTYProcess?
     @ObservationIgnored private var startedAt = Date.distantPast
 
-    init(projectID: UUID, directory: URL, fontSize: Double) {
+    init(projectID: UUID, directory: URL, fontSize: Double, fontFamily: String?) {
         self.projectID = projectID
         self.directory = directory
         view = DifTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 260))
-        view.font = Self.font(size: fontSize)
+        view.font = Self.font(size: fontSize, family: fontFamily)
         view.enableFileDrops()
         view.useOverlayScroller()
         view.onBell = { [weak self] in self?.rang() }
@@ -262,10 +262,10 @@ final class TerminalSession: Identifiable {
         applyTheme(TerminalTheme.current(for: NSApp.effectiveAppearance))
     }
 
-    static func font(size: Double) -> NSFont {
-        NSFont(name: "JetBrainsMono-Regular", size: size)
-            ?? NSFont(name: "JetBrains Mono", size: size)
-            ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    /// `family`: a family picked in Settings (a Nerd Font, say, for the icons in a shell prompt), or nil for the
+    /// default face.
+    static func font(size: Double, family: String?) -> NSFont {
+        MonospaceFonts.font(family: family, size: size)
     }
 
     var displayTitle: String { title.isEmpty ? processName : title }
@@ -493,7 +493,8 @@ final class TerminalManager {
     func open(in project: Project, directory: URL? = nil) -> TerminalSession? {
         guard AppEnvironment.hasTerminal else { return nil }
         let session = TerminalSession(projectID: project.id, directory: directory ?? project.url,
-                                      fontSize: store?.settings.terminalFontSize ?? 12)
+                                      fontSize: store?.settings.terminalFontSize ?? 12,
+                                      fontFamily: store?.settings.terminalFontFamily)
         session.manager = self
         sessions.append(session)
         isVisible = true
@@ -610,8 +611,8 @@ final class TerminalManager {
         sessions.forEach { $0.terminate() }
     }
 
-    func applyFont(size: Double) {
-        let font = TerminalSession.font(size: size)
+    func applyFont(size: Double, family: String?) {
+        let font = TerminalSession.font(size: size, family: family)
         for session in sessions { session.view.font = font }
     }
 }

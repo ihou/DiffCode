@@ -221,6 +221,25 @@ enum DebugHooks {
             store.settings.uiFontSize = Double(argument) ?? 13
         case "termfont":
             store.changeTerminalFontSize(by: (Double(argument) ?? 12) - store.settings.terminalFontSize)
+        case "codefamily":
+            // A family as picked in Settings; "default" puts back the default face.
+            store.chooseCodeFont(argument == "default" ? nil : argument)
+        case "termfamily":
+            store.chooseTerminalFont(argument == "default" ? nil : argument)
+        case "regfont":
+            // Makes a font file usable by this process only: nothing is installed on the system.
+            var error: Unmanaged<CFError>?
+            let ok = CTFontManagerRegisterFontsForURL(URL(fileURLWithPath: argument) as CFURL, .process, &error)
+            FileHandle.standardError.write(Data("regfont: \(ok) \(error.map { "\($0.takeRetainedValue())" } ?? "")\n".utf8))
+        case "fontstate":
+            let terminals = store.terminals.sessions.map { "\($0.view.font.fontName)@\($0.view.font.pointSize)" }
+            let installed = MonospaceFonts.installed()
+            FileHandle.standardError.write(Data("""
+                fontstate: code=\(store.settings.codeFontFamily ?? "default") canvas=\(store.viewer.container?.canvas.codeFont.font.fontName ?? "-") \
+                terminal=\(store.settings.terminalFontFamily ?? "default") sessions=\(terminals) default=\(MonospaceFonts.defaultName) \
+                installed(\(installed.count))=\(installed.joined(separator: ","))
+
+                """.utf8))
         case "memory":
             FileHandle.standardError.write(Data(String(format: "memory: %.1f MB\n", AppStore.footprintMB()).utf8))
         case "relief":

@@ -192,6 +192,13 @@ fn render_app(args: &[String], out: &str, dark: bool) {
             let ico = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/res/DiffCode.ico")).ok()?;
             diffcode_ui::paint::png_in_ico(&ico, pixels).map(|png| std::sync::Arc::new(png.to_vec()))
         }
+        fn monospace_families(&self) -> (String, Vec<String>) {
+            let (default, mut list) = mac::monospace_families();
+            // A long list, to see the menu scroll: HARNESS_EXTRA_FONTS=40.
+            let extra = std::env::var("HARNESS_EXTRA_FONTS").ok().and_then(|n| n.parse::<usize>().ok()).unwrap_or(0);
+            list.extend((1..=extra).map(|i| format!("Test Mono {i:02}")));
+            (default, list)
+        }
     }
 
     let values = |name: &str| -> Vec<String> { args.windows(2).filter(|w| w[0] == name).map(|w| w[1].clone()).collect() };
@@ -210,6 +217,8 @@ fn render_app(args: &[String], out: &str, dark: bool) {
     let mut settings = Settings::default();
     settings.projects = values("--project").into_iter().map(PathBuf::from).collect();
     settings.appearance = if dark { Appearance::Dark } else { Appearance::Light };
+    settings.code_font = flag("--code-font");
+    settings.terminal_font = flag("--terminal-font");
     let mut app = App::new(settings);
     let backend = mac::MacBackend::new();
     let mut st = UiState::default();

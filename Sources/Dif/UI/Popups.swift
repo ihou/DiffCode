@@ -639,6 +639,8 @@ struct KeymapView: View {
 
 struct SettingsView: View {
     @Environment(AppStore.self) private var store
+    /// Installed monospace families for the font pickers, read when Settings opens.
+    @State private var families: [String] = []
 
     var body: some View {
         @Bindable var settings = store.settings
@@ -679,6 +681,9 @@ struct SettingsView: View {
                         }
                     }
                 }
+                row(L("Code font", "代码字体")) {
+                    fontPicker(settings.codeFontFamily) { store.chooseCodeFont($0) }
+                }
                 row(L("Code font size", "代码字号")) {
                     stepper(settings.fontSize, down: "⌃⇧,", up: "⌃⇧.") { store.viewer.changeFontSize(by: $0) }
                 }
@@ -686,6 +691,9 @@ struct SettingsView: View {
                     stepper(settings.uiFontSize, down: L("Smaller", "减小"), up: L("Larger", "增大")) { store.changeInterfaceFontSize(by: $0) }
                 }
                 if AppEnvironment.hasTerminal {
+                    row(L("Terminal font", "终端字体")) {
+                        fontPicker(settings.terminalFontFamily) { store.chooseTerminalFont($0) }
+                    }
                     row(L("Terminal font size", "终端字号")) {
                         stepper(settings.terminalFontSize, down: L("Smaller", "减小"), up: L("Larger", "增大")) { store.changeTerminalFontSize(by: $0) }
                     }
@@ -703,6 +711,10 @@ struct SettingsView: View {
             .padding(20)
         }
         .onAppear { settings.reloadLanguage() }
+        .task {
+            // Fonts installed since the last time show too.
+            families = await Task.detached(priority: .userInitiated) { MonospaceFonts.installed() }.value
+        }
         .onChange(of: settings.appearance) { _, _ in
             settings.save()
             settings.applyAppearance()
@@ -719,6 +731,23 @@ struct SettingsView: View {
             Spacer()
             content()
         }
+    }
+
+    /// "Default" and the installed monospace families. A picked family that has since been uninstalled stays in the
+    /// list, marked, so the picker never shows a blank; the code falls back to the default face meanwhile.
+    private func fontPicker(_ selection: String?, choose: @escaping (String?) -> Void) -> some View {
+        let missing = selection.flatMap { families.isEmpty || families.contains($0) ? nil : $0 }
+        let choices = families.isEmpty ? selection.map { [$0] } ?? [] : families + (missing.map { [$0] } ?? [])
+        return Picker("", selection: Binding(get: { selection }, set: { choose($0) })) {
+            Text(L("Default (\(MonospaceFonts.defaultName))", "默认（\(MonospaceFonts.defaultName)）")).tag(String?.none)
+            Divider()
+            ForEach(choices, id: \.self) { family in
+                Text(family == missing ? family + L(" (not installed)", "（未安装）") : family).tag(String?.some(family))
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .frame(width: UI.s(240))
     }
 
     private func stepper(_ value: Double, down: String, up: String, change: @escaping (Double) -> Void) -> some View {

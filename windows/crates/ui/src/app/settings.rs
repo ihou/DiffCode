@@ -86,6 +86,9 @@ pub struct Settings {
     /// Interface text (lists, headers, popups); everything in the chrome scales from it.
     pub ui_font_size: f32,
     pub terminal_font_size: f32,
+    /// Font families picked for code and for terminals; None: the default monospace face.
+    pub code_font: Option<String>,
+    pub terminal_font: Option<String>,
     pub unified: bool,
     pub ignore_whitespace: bool,
     pub flat_list: bool,
@@ -121,6 +124,8 @@ impl Default for Settings {
             font_size: 12.0,
             ui_font_size: 13.0,
             terminal_font_size: 12.0,
+            code_font: None,
+            terminal_font: None,
             unified: false,
             ignore_whitespace: false,
             flat_list: false,
@@ -145,6 +150,8 @@ impl Settings {
     pub fn load(file: &Path) -> Settings {
         let mut s = Settings { file: Some(file.to_path_buf()), ..Settings::default() };
         let Ok(text) = std::fs::read_to_string(file) else { return s };
+        // Notepad may have saved it with a byte order mark, which would hide the first key.
+        let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
         let mut map: HashMap<&str, &str> = HashMap::new();
         for line in text.lines() {
             let Some((k, v)) = line.split_once('=') else { continue };
@@ -174,6 +181,9 @@ impl Settings {
         if let Some(v) = f("terminalFontSize") {
             s.terminal_font_size = clamp(v, TERMINAL_FONT_RANGE);
         }
+        let name = |k: &str| map.get(k).filter(|v| !v.is_empty()).map(|v| v.to_string());
+        s.code_font = name("codeFont");
+        s.terminal_font = name("terminalFont");
         s.unified = b("unified").unwrap_or(false);
         s.ignore_whitespace = b("ignoreWhitespace").unwrap_or(false);
         s.flat_list = b("flatList").unwrap_or(false);
@@ -219,6 +229,12 @@ impl Settings {
         put("fontSize", self.font_size.to_string());
         put("uiFontSize", self.ui_font_size.to_string());
         put("terminalFontSize", self.terminal_font_size.to_string());
+        if let Some(v) = &self.code_font {
+            put("codeFont", v.clone());
+        }
+        if let Some(v) = &self.terminal_font {
+            put("terminalFont", v.clone());
+        }
         put("unified", self.unified.to_string());
         put("ignoreWhitespace", self.ignore_whitespace.to_string());
         put("flatList", self.flat_list.to_string());
@@ -271,8 +287,22 @@ mod tests {
         s.window = Some((10, 20, 1200, 800, true));
         s.check_updates = false;
         s.skipped_update = Some("0.3.1".into());
+        s.code_font = Some("JetBrainsMono Nerd Font Mono".into());
+        s.terminal_font = Some("Cascadia Mono NF".into());
         s.save();
         let t = Settings::load(&file);
         assert_eq!(t, s);
+    }
+
+    /// Edited by hand and saved by Notepad as UTF-8 with a byte order mark.
+    #[test]
+    fn reads_a_file_saved_with_a_byte_order_mark() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("settings.ini");
+        std::fs::write(&file, "\u{feff}language=en\r\nterminalFont=MesloLGS NF\r\n").unwrap();
+        let s = Settings::load(&file);
+        assert_eq!(s.language, Language::English);
+        assert_eq!(s.terminal_font.as_deref(), Some("MesloLGS NF"));
+        assert_eq!(s.code_font, None);
     }
 }

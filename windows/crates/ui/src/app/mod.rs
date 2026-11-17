@@ -26,6 +26,7 @@ pub mod viewer;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use change_tree::ChangeRow;
@@ -120,6 +121,16 @@ pub struct Menu {
     pub at: Point,
     pub items: Vec<MenuItem>,
     pub hovered: Option<usize>,
+    /// How far a menu taller than the window is scrolled.
+    pub scroll: crate::widgets::Scroll,
+    /// An item to bring into view on the next frame: the one the keyboard moved to, or the current choice.
+    pub reveal: Option<usize>,
+}
+
+impl Menu {
+    pub fn new(at: Point, items: Vec<MenuItem>) -> Self {
+        Menu { at, items, hovered: None, scroll: Default::default(), reveal: None }
+    }
 }
 
 pub struct MenuItem {
@@ -243,6 +254,8 @@ pub struct App {
     pub caption_width: f32,
     /// Newer releases (Windows only).
     pub update: update::Updates,
+    /// The default monospace face and the installed ones, for the font settings; read when Settings opens.
+    pub font_choices: Option<(String, Vec<String>)>,
     /// The app's icon for the welcome screen, with the pixel size it was picked for.
     pub app_icon: Option<(u32, crate::paint::ImageSource)>,
     /// When to search the Log, once typing in its search field pauses.
@@ -303,6 +316,7 @@ impl App {
             drop_targeted: false,
             caption_width: 0.0,
             update: Default::default(),
+            font_choices: None,
             app_icon: None,
             log_search_at: None,
             system_chinese: false,
@@ -477,7 +491,7 @@ impl App {
                 self.context_hunk = hunk;
                 let items = self.viewer_context_menu();
                 if !items.is_empty() {
-                    self.menu = Some(Menu { at, items, hovered: None });
+                    self.menu = Some(Menu::new(at, items));
                 }
             }
             ViewerEvent::FocusCanvas => self.focus_viewer(),
@@ -977,6 +991,14 @@ impl App {
         }
     }
 
+    /// A font family picked in Settings for code; None puts back the default face.
+    pub fn choose_code_font(&mut self, family: Option<String>) {
+        if family != self.settings.code_font {
+            self.settings.code_font = family;
+            self.settings.save();
+        }
+    }
+
     pub fn change_code_font_size(&mut self, delta: f32) {
         let (lo, hi) = settings::CODE_FONT_RANGE;
         let size = (self.settings.font_size + delta).clamp(lo, hi);
@@ -1081,6 +1103,10 @@ impl App {
             }
         }
         self.menu = None;
+        if kind == Popup::Settings {
+            // Fonts installed since it was last open show too.
+            self.font_choices = None;
+        }
         self.popup = Some(kind);
     }
 
@@ -1244,7 +1270,10 @@ fn neighbour(files: &[FileChange], selected: Option<&str>, delta: i32) -> Option
 impl Program for App {
     fn theme(&mut self, system_dark: bool) -> Theme {
         self.system_dark = system_dark;
-        Theme::new(self.is_dark(), self.settings.ui_font_size, self.settings.font_size)
+        let mut theme = Theme::new(self.is_dark(), self.settings.ui_font_size, self.settings.font_size);
+        theme.code_family = self.settings.code_font.as_deref().map(Arc::from);
+        theme.terminal_family = self.settings.terminal_font.as_deref().map(Arc::from);
+        theme
     }
 
     fn frame(&mut self, ui: &mut Ui, platform: &mut dyn Platform) {

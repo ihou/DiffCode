@@ -227,6 +227,10 @@ impl<'a> Ui<'a> {
         size: Size,
     ) -> Ui<'a> {
         st.frame += 1;
+        // A face picked in Settings since the last frame: what was laid out in the old one goes.
+        if backend.set_families(theme.code_family.as_deref(), theme.terminal_family.as_deref()) {
+            st.cache.clear();
+        }
         st.hits_prev = std::mem::take(&mut st.hits);
         st.scrolls_prev = std::mem::take(&mut st.scrolls);
         st.hovered = if st.mouse_inside { topmost(&st.hits_prev, st.mouse) } else { None };

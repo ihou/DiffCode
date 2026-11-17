@@ -1318,6 +1318,10 @@ impl Platform for WinPlatform {
         &mut self.clipboard
     }
 
+    fn monospace_families(&self) -> (String, Vec<String>) {
+        render::monospace_families()
+    }
+
     fn pick_folder(&mut self, title: &str) -> Option<PathBuf> {
         unsafe {
             let dialog: IFileOpenDialog = CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER).ok()?;
@@ -1443,6 +1447,35 @@ impl Platform for WinPlatform {
 #[cfg(test)]
 mod tests {
     use diffcode_ui::app::update::{parse_release, LATEST};
+    use diffcode_ui::paint::{Backend, Font};
+
+    #[test]
+    fn lists_the_installed_monospace_fonts() {
+        let (default, list) = super::render::monospace_families();
+        assert!(["Cascadia Mono", "Consolas", "Courier New"].contains(&default.as_str()), "default {default}");
+        assert!(list.iter().any(|f| f == "Consolas") && list.iter().any(|f| f == "Courier New"), "{list:?}");
+        assert!(!list.iter().any(|f| f == "Segoe UI" || f == "Arial" || f == "Wingdings"), "{list:?}");
+        eprintln!("default {default}; {} monospace families: {list:?}", list.len());
+    }
+
+    #[test]
+    fn draws_in_the_faces_picked_in_settings() {
+        let backend = super::render::DxBackend::new().expect("DirectWrite");
+        let (code, terminal) = (Font::mono(12.0), Font::terminal(12.0));
+        let default = backend.metrics(code);
+        assert_eq!(backend.metrics(terminal), default);
+        assert!(backend.set_families(Some("Courier New"), None));
+        assert!(!backend.set_families(Some("Courier New"), None), "the same pick again changes nothing");
+        let courier = backend.metrics(code);
+        assert_ne!(courier, default);
+        assert_eq!(backend.metrics(terminal), default, "the terminal keeps its own face");
+        assert!(backend.set_families(Some("Courier New"), Some("Courier New")));
+        assert_eq!(backend.metrics(terminal), courier);
+        // A family that is not installed draws in the default face.
+        assert!(backend.set_families(Some("No Such Font 4F2A"), None));
+        assert_eq!(backend.metrics(code), default);
+        assert_eq!(backend.metrics(terminal), default);
+    }
 
     /// The real request the update check makes, through WinINet and whatever proxy Windows is set to use. It needs
     /// the network, so it runs only when asked: `cargo test -p diffcode -- --ignored`.

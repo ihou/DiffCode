@@ -98,7 +98,7 @@ final class ViewerModel: CodeCanvasDelegate {
     func attach(_ container: CodeScrollContainer) {
         self.container = container
         container.canvas.delegate = self
-        container.canvas.codeFont = CodeFont(size: settings.fontSize)
+        container.canvas.codeFont = CodeFont.current(settings)
         container.onUserScroll = { [weak self] in self?.detachedFromFocus = true }
         container.show(document, mode: canvasMode, preserveScroll: false)
         container.canvas.showsRevertButtons = canRevertHunks
@@ -379,7 +379,12 @@ final class ViewerModel: CodeCanvasDelegate {
         guard size != settings.fontSize else { return }
         settings.fontSize = size
         settings.save()
-        container?.canvas.codeFont = CodeFont(size: size)
+        applyCodeFont()
+    }
+
+    /// Draws the code in the font Settings asks for now.
+    func applyCodeFont() {
+        container?.canvas.codeFont = CodeFont.current(settings)
     }
 
     func focusCanvas() {

@@ -198,6 +198,50 @@ struct CanvasTheme {
     }
 }
 
+/// The monospace faces code and terminals are drawn in: a family picked in Settings, else JetBrains Mono when it is
+/// installed, else the system's own monospace face. A picked family that is no longer installed counts as none.
+enum MonospaceFonts {
+    /// What "Default" stands for in Settings.
+    static var defaultName: String {
+        NSFont(name: "JetBrainsMono-Regular", size: 12) != nil ? "JetBrains Mono" : "SF Mono"
+    }
+
+    static func font(family: String?, size: CGFloat) -> NSFont {
+        if let family, let font = regular(family, size: size) { return font }
+        return NSFont(name: "JetBrainsMono-Regular", size: size)
+            ?? NSFont(name: "JetBrains Mono", size: size)
+            ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    /// The regular face of an installed family; nil when no family has that name.
+    static func regular(_ family: String, size: CGFloat) -> NSFont? {
+        guard let font = NSFont(descriptor: NSFontDescriptor(fontAttributes: [.family: family]), size: size),
+              font.familyName == family else { return nil }
+        return font
+    }
+
+    /// The installed families code can be drawn in, by name: those whose letters, digits and punctuation all have
+    /// one width (the canvas puts characters in columns). Tens of milliseconds, so not on the main thread.
+    static func installed() -> [String] {
+        let families = CTFontManagerCopyAvailableFontFamilyNames() as? [String] ?? []
+        return families
+            .filter { !$0.hasPrefix(".") && (regular($0, size: 12).map(isMonospaced) ?? false) }
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    /// Measured rather than read from the font's flags: some faces flagged monospace have Latin letters of
+    /// different widths, and patched faces (Nerd Fonts) may lose the flag although their letters keep one width.
+    static func isMonospaced(_ font: NSFont) -> Bool {
+        let characters = Array("iMW0.l_m ".utf16)
+        var glyphs = [CGGlyph](repeating: 0, count: characters.count)
+        guard CTFontGetGlyphsForCharacters(font, characters, &glyphs, characters.count) else { return false }
+        var advances = [CGSize](repeating: .zero, count: glyphs.count)
+        CTFontGetAdvancesForGlyphs(font, .horizontal, glyphs, &advances, glyphs.count)
+        let width = advances[0].width
+        return width > 0 && advances.allSatisfy { abs($0.width - width) < 0.01 }
+    }
+}
+
 /// Font and derived metrics for code rendering.
 struct CodeFont: Equatable {
     let font: NSFont
@@ -206,18 +250,23 @@ struct CodeFont: Equatable {
     let baseline: CGFloat
     let charWidth: CGFloat
 
-    init(size: CGFloat) {
+    /// `family`: a family picked in Settings, or nil for the default face.
+    init(size: CGFloat, family: String? = nil) {
         self.size = size
-        font = NSFont(name: "JetBrainsMono-Regular", size: size)
-            ?? NSFont(name: "JetBrains Mono", size: size)
-            ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        font = MonospaceFonts.font(family: family, size: size)
         lineHeight = (size * 1.5).rounded()
         let ascent = CTFontGetAscent(font), descent = CTFontGetDescent(font)
         baseline = ((lineHeight - (ascent + descent)) / 2 + ascent).rounded()
         charWidth = ("0" as NSString).size(withAttributes: [.font: font]).width
     }
 
-    static func == (a: CodeFont, b: CodeFont) -> Bool { a.size == b.size }
+    /// The code font Settings asks for.
+    @MainActor
+    static func current(_ settings: Settings = .shared) -> CodeFont {
+        CodeFont(size: settings.fontSize, family: settings.codeFontFamily)
+    }
+
+    static func == (a: CodeFont, b: CodeFont) -> Bool { a.size == b.size && a.font.fontName == b.font.fontName }
 }
 
 /// Interface metrics. Sizes in the views are written for the default 13 pt interface font and
@@ -246,6 +295,9 @@ extension Font {
     @MainActor
     static func code(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         let scaled = size * UI.scale
+        if let family = Settings.shared.codeFontFamily, let font = MonospaceFonts.regular(family, size: scaled) {
+            return .custom(font.fontName, size: scaled).weight(weight)
+        }
         if NSFont(name: "JetBrainsMono-Regular", size: scaled) != nil {
             return .custom("JetBrains Mono", size: scaled).weight(weight)
         }

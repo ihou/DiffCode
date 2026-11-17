@@ -6,6 +6,7 @@ use crate::icons::Icon;
 use crate::input::{Event, Key, Modifiers};
 use crate::paint::Overflow;
 use crate::ui::{layer, Align, Id, Ui};
+use crate::widgets::vscrollbar;
 
 impl App {
     /// Opens a menu with its top left at `at` (moved in to fit the window).
@@ -24,7 +25,15 @@ impl App {
         while tidy.last().is_some_and(|l| l.separator) {
             tidy.pop();
         }
-        self.menu = Some(Menu { at, items: tidy, hovered: None });
+        self.menu = Some(Menu::new(at, tidy));
+    }
+
+    /// Opens a menu of choices scrolled to the current one (the ticked item), when it is too long for the window.
+    pub fn open_choice_menu(&mut self, at: Point, items: Vec<MenuItem>) {
+        self.open_menu(at, items);
+        if let Some(menu) = self.menu.as_mut() {
+            menu.reveal = menu.items.iter().position(|i| i.checked);
+        }
     }
 }
 
@@ -50,14 +59,22 @@ pub fn menu(app: &mut App, ui: &mut Ui) {
     let w = (check_w + title_w + if short_w > 0.0 { t.s(28.0) + short_w } else { 0.0 } + t.s(18.0) + pad * 2.0)
         .max(t.s(180.0))
         .min(ui.size.w - 16.0);
-    let h: f32 = menu.items.iter().map(|i| if i.separator { sep_h } else { row_h }).sum::<f32>() + pad * 2.0;
+    let height = |i: &MenuItem| if i.separator { sep_h } else { row_h };
+    let content: f32 = menu.items.iter().map(height).sum::<f32>() + pad * 2.0;
     let bounds = ui.bounds().inset(6.0);
+    // Taller than the window (a long list of fonts), it scrolls.
+    let h = content.min(bounds.h);
     let mut rect = Rect::new(menu.at.x, menu.at.y, w, h);
     if rect.bottom() > bounds.bottom() {
         // Opens upwards when there is no room below.
         rect.y = (menu.at.y - h).max(bounds.y);
     }
     let rect = rect.clamped_into(&bounds).snapped(ui.painter.scale());
+    if let Some(i) = menu.reveal.take().filter(|i| *i < menu.items.len()) {
+        let top: f32 = menu.items[..i].iter().map(height).sum();
+        menu.scroll.reveal(top, row_h + pad * 2.0, rect.h);
+    }
+    menu.scroll.clamp(content, rect.h);
 
     let mut activate: Option<usize> = None;
     let mut close = false;
@@ -72,9 +89,21 @@ pub fn menu(app: &mut App, ui: &mut Ui) {
         ui.round(rect, t.s(8.0), t.elevated);
         ui.painter.stroke_round_rect(rect.inset(0.5), t.s(8.0), 1.0, t.hairline);
         ui.block(Id::new("menu-panel"), rect);
-        let mut y = rect.y + pad;
+        if let Some(delta) = ui.scroll_target(Id::new("menu-scroll"), rect) {
+            menu.scroll.offset += delta.y;
+            menu.scroll.clamp(content, rect.h);
+        }
+        let scrolls = content > rect.h + 0.5;
+        if scrolls {
+            ui.push_clip(rect.inset(1.0));
+        }
+        let mut y = rect.y + pad - menu.scroll.offset;
         let moved = matches!(ui.event, Some(Event::MouseMove(_)));
         for (i, item) in menu.items.iter().enumerate() {
+            if y > rect.bottom() || y + height(item) < rect.y {
+                y += height(item);
+                continue;
+            }
             if item.separator {
                 ui.hline(rect.x + pad + t.s(6.0), y + sep_h / 2.0, rect.w - pad * 2.0 - t.s(12.0), t.hairline);
                 y += sep_h;
@@ -112,6 +141,10 @@ pub fn menu(app: &mut App, ui: &mut Ui) {
             }
             y += row_h;
         }
+        if scrolls {
+            ui.pop_clip();
+            vscrollbar(ui, Id::new("menu-scrollbar"), rect.inset(t.s(2.0)), content - t.s(4.0), &mut menu.scroll);
+        }
     });
 
     finish(app, activate, close);
@@ -129,10 +162,12 @@ pub fn menu_keys(app: &mut App, ui: &mut Ui) {
             match key {
                 Key::Down if !enabled.is_empty() => {
                     menu.hovered = Some(enabled[pos.map_or(0, |p| (p + 1) % enabled.len())]);
+                    menu.reveal = menu.hovered;
                     ui.consume();
                 }
                 Key::Up if !enabled.is_empty() => {
                     menu.hovered = Some(enabled[pos.map_or(enabled.len() - 1, |p| (p + enabled.len() - 1) % enabled.len())]);
+                    menu.reveal = menu.hovered;
                     ui.consume();
                 }
                 Key::Enter | Key::Space => {

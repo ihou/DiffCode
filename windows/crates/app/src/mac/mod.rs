@@ -23,11 +23,48 @@ use ffi::*;
 pub struct MacBackend {
     fonts: RefCell<HashMap<Font, Cf>>,
     images: RefCell<HashMap<u64, Option<Cf>>>,
+    /// The families picked for code and for terminals.
+    families: RefCell<(Option<String>, Option<String>)>,
+}
+
+/// The font of an installed family at `size`; None when no family has that name.
+fn family_font(name: &str, size: f64) -> Option<Cf> {
+    unsafe {
+        let f = Cf(CTFontCreateWithName(cfstr(name).ptr(), size, std::ptr::null()));
+        let family = Cf(CTFontCopyFamilyName(f.ptr()));
+        (cf_string(family.ptr()) == name).then_some(f)
+    }
+}
+
+/// The harness's stand-in for Cascadia Mono.
+fn default_mono_name() -> &'static str {
+    if family_font("JetBrains Mono", 12.0).is_some() {
+        "JetBrains Mono"
+    } else {
+        "Menlo"
+    }
+}
+
+/// The default monospace face and the installed monospace families, as the Windows shell reports them.
+pub fn monospace_families() -> (String, Vec<String>) {
+    let mut list = Vec::new();
+    unsafe {
+        let names = Cf(CTFontManagerCopyAvailableFontFamilyNames());
+        for i in 0..CFArrayGetCount(names.ptr()) {
+            let name = cf_string(CFArrayGetValueAtIndex(names.ptr(), i));
+            // kCTFontTraitMonoSpace
+            if !name.starts_with('.') && family_font(&name, 12.0).is_some_and(|f| CTFontGetSymbolicTraits(f.ptr()) & (1 << 10) != 0) {
+                list.push(name);
+            }
+        }
+    }
+    list.sort_by_key(|n| n.to_lowercase());
+    (default_mono_name().to_string(), list)
 }
 
 impl MacBackend {
     pub fn new() -> Self {
-        MacBackend { fonts: RefCell::new(HashMap::new()), images: RefCell::new(HashMap::new()) }
+        MacBackend { fonts: RefCell::new(HashMap::new()), images: RefCell::new(HashMap::new()), families: RefCell::new((None, None)) }
     }
 
     fn font(&self, font: Font) -> Cf {
@@ -38,14 +75,13 @@ impl MacBackend {
         let base = unsafe {
             match font.kind {
                 FontKind::Ui => Cf(CTFontCreateUIFontForLanguage(kCTFontUIFontSystem, size, std::ptr::null())),
-                FontKind::Mono => {
-                    let f = Cf(CTFontCreateWithName(cfstr("JetBrains Mono").ptr(), size, std::ptr::null()));
-                    let family = Cf(CTFontCopyFamilyName(f.ptr()));
-                    if CFStringGetLength(family.ptr()) > 0 && cf_string(family.ptr()).contains("JetBrains") {
-                        f
-                    } else {
-                        Cf(CTFontCreateWithName(cfstr("Menlo").ptr(), size, std::ptr::null()))
-                    }
+                FontKind::Mono | FontKind::Terminal => {
+                    let families = self.families.borrow();
+                    let picked = if font.kind == FontKind::Mono { &families.0 } else { &families.1 };
+                    picked
+                        .as_deref()
+                        .and_then(|name| family_font(name, size))
+                        .unwrap_or_else(|| Cf(CTFontCreateWithName(cfstr(default_mono_name()).ptr(), size, std::ptr::null())))
                 }
             }
         };
@@ -221,6 +257,16 @@ impl TextLayout for CtLayout {
 }
 
 impl Backend for MacBackend {
+    fn set_families(&self, code: Option<&str>, terminal: Option<&str>) -> bool {
+        let picked = (code.map(String::from), terminal.map(String::from));
+        if *self.families.borrow() == picked {
+            return false;
+        }
+        *self.families.borrow_mut() = picked;
+        self.fonts.borrow_mut().retain(|f, _| f.kind == FontKind::Ui);
+        true
+    }
+
     fn layout(&self, req: &TextRequest) -> Rc<dyn TextLayout> {
         let text: &str = &req.text;
         let style = &req.style;
