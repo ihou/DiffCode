@@ -56,7 +56,7 @@ Checked against `docs/GUIDE.zh-CN.md`, feature by feature, in the Mac harness (`
 | Git graph popup | done |
 | Cherry-pick / revert / reset | done |
 | Blame, file / selection history, compare with branch / commits | done |
-| Quick open, find in path, search everywhere, keymap, settings | done |
+| Quick open, find in path, search everywhere, keymap, settings (including the fonts for code and for the terminal) | done |
 | Integrated terminal (alacritty_terminal + ConPTY) | done: panes side by side, dividers, scrollback 2000, selection, copy/paste, mouse reporting, IME, bell → attention, busy check on close/quit |
 | Language switch with restart | done (`--relaunch`, single instance) |
 | Window placement saved | done |

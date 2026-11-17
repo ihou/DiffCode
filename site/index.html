@@ -46,7 +46,7 @@
   "applicationCategory": "DeveloperApplication",
   "applicationSubCategory": "Git client",
   "operatingSystem": "macOS 14 or later, Windows 10 or later",
-  "processorRequirements": "Apple Silicon (Mac), x64 (Windows)",
+  "processorRequirements": "Apple Silicon or Intel (Mac), x64 (Windows)",
   "fileSize": "4 MB",
   "downloadUrl": "https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg",
   "screenshot": "https://ihou.github.io/DiffCode/images/hero.png",
@@ -70,7 +70,7 @@
     { "@type": "Question", "name": "Can I review changes made by Claude Code or Codex?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Run the agent in DiffCode's built-in terminal, or anywhere else, and every file it changes appears in the diff as it works. Compare with Branch shows everything since the agent's branch split off." } },
     { "@type": "Question", "name": "Can I commit only part of a file?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Untick a hunk, or select lines and leave them out of the commit. Those changes stay in your working tree for later." } },
     { "@type": "Question", "name": "Does DiffCode change my repository?", "acceptedAnswer": { "@type": "Answer", "text": "Not until you act. Refreshing, diffing and searching never write to the repository or take index.lock, so DiffCode can stay open next to your IDE, terminal and agents." } },
-    { "@type": "Question", "name": "Which Macs does DiffCode run on?", "acceptedAnswer": { "@type": "Answer", "text": "Apple Silicon Macs running macOS 14 Sonoma or later. Intel Macs are untested. The app is signed and notarized by Apple." } },
+    { "@type": "Question", "name": "Which Macs does DiffCode run on?", "acceptedAnswer": { "@type": "Answer", "text": "Any Mac running macOS 14 Sonoma or later, with Apple Silicon or an Intel processor. The main download is for Apple Silicon; Intel Macs have their own, DiffCode-Intel.pkg. Both are signed and notarized by Apple and keep themselves up to date." } },
     { "@type": "Question", "name": "Does DiffCode run on Windows?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. DiffCode for Windows runs on 64-bit Windows 10 (1809) or Windows 11 and uses Git for Windows. It is a native app with the same features, and its built-in terminal runs PowerShell or cmd. The installer is not code-signed, so SmartScreen may warn the first time you run it: choose More info, then Run anyway." } },
     { "@type": "Question", "name": "How does DiffCode update?", "acceptedAnswer": { "@type": "Answer", "text": "On the Mac it checks for updates and installs new versions from inside the app. On Windows it tells you when a new version is out and opens the download page. You can also download the latest release from GitHub at any time." } }
   ]
@@ -117,7 +117,7 @@
 
 <section class="hero">
   <div class="wrap">
-    <a class="badge" href="https://github.com/ihou/DiffCode/releases/latest"><span class="badge-tag">New</span>What's new in <span data-version>0.3.1</span><span class="badge-arrow" aria-hidden="true">›</span></a>
+    <a class="badge" href="https://github.com/ihou/DiffCode/releases/latest"><span class="badge-tag">New</span>What's new in <span data-version>0.3.2</span><span class="badge-arrow" aria-hidden="true">›</span></a>
     <h1>An IDE-grade Git diff viewer, <span class="grad">without the&nbsp;IDE.</span></h1>
     <p class="lede">DiffCode is a lightweight, native Git client for macOS and Windows. Review every change side by side — yours, your teammates' or your coding agent's — and commit exactly the lines you mean, in about <strong>30–50 MB</strong> of memory.</p>
     <div class="cta">
@@ -127,7 +127,7 @@
     </div>
     <ul class="facts">
       <li>Free and open source</li>
-      <li>macOS 14 or later, Apple Silicon</li>
+      <li>macOS 14 or later, Apple Silicon or <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg">Intel</a></li>
       <li>Windows 10 or 11</li>
       <li>No account</li>
     </ul>
@@ -270,7 +270,7 @@
       <div class="card reveal"><span class="card-ico" style="--c: #7c5cff"><svg class="i"><use href="#i-code"/></svg></span><h3>Syntax highlighting for your stack</h3><p>Kotlin, Java, Swift, TypeScript, Python, Go, Rust, C/C++, C#, Dart and more. Image diffs too, and you can ignore whitespace.</p></div>
       <div class="card reveal"><span class="card-ico" style="--c: #f08c00"><svg class="i"><use href="#i-stash"/></svg></span><h3>Stash</h3><p>Stash local changes, then apply, pop or drop them from a list. Dropping a stash can be undone.</p></div>
       <div class="card reveal"><span class="card-ico" style="--c: #0ea5e9"><svg class="i"><use href="#i-prompt"/></svg></span><h3>Open from the terminal</h3><p>Run <code>dif</code> in a repository, or <code>dif ~/work/app ~/work/lib</code>, to open it in DiffCode. Or drag folders into the sidebar.</p></div>
-      <div class="card reveal"><span class="card-ico" style="--c: #e64980"><svg class="i"><use href="#i-theme"/></svg></span><h3>Light or dark, English or 中文</h3><p>Dark, light or follow the system, with separate font sizes for code, interface and terminal. The language follows your system.</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #e64980"><svg class="i"><use href="#i-theme"/></svg></span><h3>Light or dark, English or 中文</h3><p>Dark, light or follow the system. Pick the fonts for code and for the terminal, and size code, interface and terminal separately. The language follows your system.</p></div>
     </div>
   </div>
 </section>
@@ -324,7 +324,7 @@
       <div class="qa"><h3>Can I review changes made by Claude Code or Codex?</h3><p>Yes. Run the agent in DiffCode's built-in terminal, or anywhere else, and every file it changes appears in the diff as it works. Compare with Branch shows everything since the agent's branch split off.</p></div>
       <div class="qa"><h3>Can I commit only part of a file?</h3><p>Yes. Untick a hunk, or select lines and leave them out of the commit. Those changes stay in your working tree for later.</p></div>
       <div class="qa"><h3>Does DiffCode change my repository?</h3><p>Not until you act. Refreshing, diffing and searching never write to the repository or take <code>index.lock</code>, so DiffCode can stay open next to your IDE, terminal and agents.</p></div>
-      <div class="qa"><h3>Which Macs does DiffCode run on?</h3><p>Apple Silicon Macs running macOS 14 Sonoma or later. Intel Macs are untested. The app is signed and notarized by Apple.</p></div>
+      <div class="qa"><h3>Which Macs does DiffCode run on?</h3><p>Any Mac running macOS 14 Sonoma or later, with Apple Silicon or an Intel processor. The main download is for Apple Silicon; Intel Macs have their own, <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg">DiffCode-Intel.pkg</a>. Both are signed and notarized by Apple and keep themselves up to date.</p></div>
       <div class="qa"><h3>Does DiffCode run on Windows?</h3><p>Yes. DiffCode for Windows runs on 64-bit Windows 10 (1809) or Windows 11 and uses <a href="https://git-scm.com/download/win">Git for Windows</a>. It is a native app with the same features, and its built-in terminal runs PowerShell or cmd. The installer is not code-signed, so SmartScreen may warn the first time you run it: choose <b>More info</b>, then <b>Run anyway</b>.</p></div>
       <div class="qa"><h3>How does DiffCode update?</h3><p>On the Mac it checks for updates and installs new versions from inside the app. On Windows it tells you when a new version is out and opens the download page. You can also download the latest release from GitHub at any time.</p></div>
     </div>
@@ -341,7 +341,7 @@
         <a class="btn" data-os="mac" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><svg class="i"><use href="#i-down"/></svg><span>Download for Mac</span><span class="btn-size"><span data-size>4.0</span> MB</span></a>
         <a class="btn alt" data-os="windows" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe"><svg class="i"><use href="#i-down"/></svg><span>Download for Windows</span><span class="btn-size"><span data-size-win>4.0</span> MB</span></a>
       </div>
-      <p class="small">Mac: open DiffCode.pkg and follow the installer. macOS 14 Sonoma or later, Apple Silicon.<br>
+      <p class="small">Mac: open DiffCode.pkg and follow the installer. macOS 14 Sonoma or later, Apple Silicon; on an Intel Mac, download <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg">DiffCode-Intel.pkg</a> instead.<br>
         Windows: run the installer; no administrator rights needed. 64-bit Windows 10 or 11. It is not code-signed, so if SmartScreen stops it, choose More info → Run anyway.<br>
         <a href="https://github.com/ihou/DiffCode/releases/latest">Release notes</a> · <a href="https://github.com/ihou/DiffCode#build-from-source">Build from source</a> · <a href="https://github.com/ihou/DiffCode/releases">All versions</a></p>
     </div>

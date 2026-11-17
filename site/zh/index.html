@@ -39,7 +39,7 @@
   "applicationCategory": "DeveloperApplication",
   "applicationSubCategory": "Git 客户端",
   "operatingSystem": "macOS 14 及以上，Windows 10 及以上",
-  "processorRequirements": "Apple Silicon（Mac），x64（Windows）",
+  "processorRequirements": "Apple Silicon 或 Intel（Mac），x64（Windows）",
   "fileSize": "4 MB",
   "downloadUrl": "https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg",
   "screenshot": "https://ihou.github.io/DiffCode/images/chinese.png",
@@ -63,7 +63,7 @@
     { "@type": "Question", "name": "能看 Claude Code 或 Codex 改了什么吗？", "acceptedAnswer": { "@type": "Answer", "text": "能。在 DiffCode 的内置终端里（或者任何地方）运行 agent，它改的每个文件都会实时出现在 diff 里。「与分支比较」可以一次看完 agent 自分叉以来的全部改动。" } },
     { "@type": "Question", "name": "能只提交文件的一部分吗？", "acceptedAnswer": { "@type": "Answer", "text": "能。取消勾选某一处改动，或者选中几行不提交，这些改动会留在工作区，下次再提交。" } },
     { "@type": "Question", "name": "DiffCode 会改动我的仓库吗？", "acceptedAnswer": { "@type": "Answer", "text": "你不动手，它就不写入。刷新、diff 和搜索都不写仓库，也不占 index.lock，可以和 IDE、终端、agent 同时开着。" } },
-    { "@type": "Question", "name": "支持哪些 Mac？", "acceptedAnswer": { "@type": "Answer", "text": "运行 macOS 14 Sonoma 及以上的 Apple Silicon Mac，Intel Mac 未经测试。应用经过 Apple 签名和公证。" } },
+    { "@type": "Question", "name": "支持哪些 Mac？", "acceptedAnswer": { "@type": "Answer", "text": "运行 macOS 14 Sonoma 及以上的 Mac 都可以，Apple Silicon 和 Intel 处理器都支持。主下载是 Apple Silicon 版；Intel Mac 有单独的安装包 DiffCode-Intel.pkg。两者都经过 Apple 签名和公证，装好后会自动更新。" } },
     { "@type": "Question", "name": "有 Windows 版吗？", "acceptedAnswer": { "@type": "Answer", "text": "有。Windows 版支持 64 位 Windows 10（1809）及 Windows 11，需要安装 Git for Windows。它是原生应用，功能和 Mac 版一致，内置终端运行 PowerShell 或 cmd。安装包没有代码签名，第一次运行时 SmartScreen 可能会拦一下，点「更多信息」再点「仍要运行」即可。" } },
     { "@type": "Question", "name": "DiffCode 怎么更新？", "acceptedAnswer": { "@type": "Answer", "text": "Mac 版会自己检查更新，并在应用内安装新版本；Windows 版有新版本时会提示，并打开下载页。你也可以随时在 GitHub 下载最新版本。" } }
   ]
@@ -110,7 +110,7 @@
 
 <section class="hero">
   <div class="wrap">
-    <a class="badge" href="https://github.com/ihou/DiffCode/releases/latest"><span class="badge-tag">新版</span><span data-version>0.3.1</span> 更新了什么<span class="badge-arrow" aria-hidden="true">›</span></a>
+    <a class="badge" href="https://github.com/ihou/DiffCode/releases/latest"><span class="badge-tag">新版</span><span data-version>0.3.2</span> 更新了什么<span class="badge-arrow" aria-hidden="true">›</span></a>
     <h1>像 IDE 一样好用的 <span class="nw">Git diff 工具，</span><br><span class="nw grad">不用打开 IDE。</span></h1>
     <p class="lede">DiffCode 是一个轻量的原生 Git 客户端，支持 Mac 和 Windows。并排查看每一处代码改动——你自己的、同事的，或者 coding agent 的——只提交你想提交的那几行。平时只占 <strong class="nw">30–50 MB</strong> 内存。</p>
     <div class="cta">
@@ -120,7 +120,7 @@
     </div>
     <ul class="facts">
       <li>免费开源</li>
-      <li>macOS 14 及以上（Apple Silicon）</li>
+      <li>macOS 14 及以上，Apple Silicon 或 <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg">Intel</a></li>
       <li>Windows 10 或 11</li>
       <li>无需账号</li>
     </ul>
@@ -263,7 +263,7 @@
       <div class="card reveal"><span class="card-ico" style="--c: #7c5cff"><svg class="i"><use href="#i-code"/></svg></span><h3>常用语言都有语法高亮</h3><p>Kotlin、Java、Swift、TypeScript、Python、Go、Rust、C/C++、C#、Dart 等，还能对比图片、忽略空白。</p></div>
       <div class="card reveal"><span class="card-ico" style="--c: #f08c00"><svg class="i"><use href="#i-stash"/></svg></span><h3>Stash</h3><p>暂存本地改动，在列表里应用、弹出或删除，删除也能撤销。</p></div>
       <div class="card reveal"><span class="card-ico" style="--c: #0ea5e9"><svg class="i"><use href="#i-prompt"/></svg></span><h3>从终端打开</h3><p>在仓库里运行 <code>dif</code>，或者 <code>dif ~/work/app ~/work/lib</code>，就能在 DiffCode 里打开；也可以把文件夹拖进侧边栏。</p></div>
-      <div class="card reveal"><span class="card-ico" style="--c: #e64980"><svg class="i"><use href="#i-theme"/></svg></span><h3>深色或浅色，中文或 English</h3><p>深色、浅色或跟随系统，代码、界面、终端字号分别可调；界面语言跟随系统，也能在设置里切换。</p></div>
+      <div class="card reveal"><span class="card-ico" style="--c: #e64980"><svg class="i"><use href="#i-theme"/></svg></span><h3>深色或浅色，中文或 English</h3><p>深色、浅色或跟随系统；代码和终端的字体可以自选，代码、界面、终端字号分别可调；界面语言跟随系统，也能在设置里切换。</p></div>
     </div>
   </div>
 </section>
@@ -317,7 +317,7 @@
       <div class="qa"><h3>能看 Claude Code 或 Codex 改了什么吗？</h3><p>能。在 DiffCode 的内置终端里（或者任何地方）运行 agent，它改的每个文件都会实时出现在 diff 里。「与分支比较」可以一次看完 agent 自分叉以来的全部改动。</p></div>
       <div class="qa"><h3>能只提交文件的一部分吗？</h3><p>能。取消勾选某一处改动，或者选中几行不提交，这些改动会留在工作区，下次再提交。</p></div>
       <div class="qa"><h3>DiffCode 会改动我的仓库吗？</h3><p>你不动手，它就不写入。刷新、diff 和搜索都不写仓库，也不占 <code>index.lock</code>，可以和 IDE、终端、agent 同时开着。</p></div>
-      <div class="qa"><h3>支持哪些 Mac？</h3><p>运行 macOS 14 Sonoma 及以上的 Apple Silicon Mac，Intel Mac 未经测试。应用经过 Apple 签名和公证。</p></div>
+      <div class="qa"><h3>支持哪些 Mac？</h3><p>运行 macOS 14 Sonoma 及以上的 Mac 都可以，Apple Silicon 和 Intel 处理器都支持。主下载是 Apple Silicon 版；Intel Mac 有单独的安装包 <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg">DiffCode-Intel.pkg</a>。两者都经过 Apple 签名和公证，装好后会自动更新。</p></div>
       <div class="qa"><h3>有 Windows 版吗？</h3><p>有。Windows 版支持 64 位 Windows 10（1809）及 Windows 11，需要安装 <a href="https://git-scm.com/download/win">Git for Windows</a>。它是原生应用，功能和 Mac 版一致，内置终端运行 PowerShell 或 cmd。安装包没有代码签名，第一次运行时 SmartScreen 可能会拦一下，点<b>「更多信息」</b>再点<b>「仍要运行」</b>即可。</p></div>
       <div class="qa"><h3>DiffCode 怎么更新？</h3><p>Mac 版会自己检查更新，并在应用内安装新版本；Windows 版有新版本时会提示，并打开下载页。你也可以随时在 GitHub 下载最新版本。</p></div>
     </div>
@@ -334,7 +334,7 @@
         <a class="btn" data-os="mac" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><svg class="i"><use href="#i-down"/></svg><span>下载 Mac 版</span><span class="btn-size"><span data-size>4.0</span> MB</span></a>
         <a class="btn alt" data-os="windows" href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe"><svg class="i"><use href="#i-down"/></svg><span>下载 Windows 版</span><span class="btn-size"><span data-size-win>4.0</span> MB</span></a>
       </div>
-      <p class="small">Mac：打开 DiffCode.pkg，按提示完成安装。需要 macOS 14 Sonoma 及以上、Apple Silicon。<br>
+      <p class="small">Mac：打开 DiffCode.pkg，按提示完成安装。需要 macOS 14 Sonoma 及以上，适用于 Apple Silicon；Intel 处理器的 Mac 请改下 <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg">DiffCode-Intel.pkg</a>。<br>
         Windows：运行安装包即可，不需要管理员权限。需要 64 位 Windows 10 或 11。安装包没有代码签名，SmartScreen 拦下时点「更多信息 → 仍要运行」。<br>
         <a href="https://github.com/ihou/DiffCode/releases/latest">更新说明</a> · <a href="https://github.com/ihou/DiffCode/blob/main/README.zh-CN.md#从源码构建">从源码构建</a> · <a href="https://github.com/ihou/DiffCode/releases">所有版本</a></p>
     </div>

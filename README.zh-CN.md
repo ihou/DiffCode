@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://ihou.github.io/DiffCode/zh/"><b>官网</b></a> · 下载 <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>Mac 版</b></a> / <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe"><b>Windows 版</b></a>（4 MB）<br>
+  <a href="https://ihou.github.io/DiffCode/zh/"><b>官网</b></a> · 下载 <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>Mac 版</b></a> / <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg"><b>Intel Mac 版</b></a> / <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe"><b>Windows 版</b></a>（4 MB）<br>
   <a href="README.md">English</a> · 简体中文
 </p>
 
@@ -55,7 +55,7 @@ AI 写的代码越来越多，同事也在不停地推提交，每天花在看 d
 - Stash 列表、逐行追溯（Blame，悬停看提交详情）、文件和选中几行的历史，以及「与分支比较」：一次看完 agent 自分叉以来的全部改动，已提交的和没提交的都在。
 
 **其他**
-- 深色 / 浅色 / 跟随系统；界面语言 跟随系统 / English / 简体中文；代码、界面、终端字号分别可调。
+- 深色 / 浅色 / 跟随系统；界面语言 跟随系统 / English / 简体中文；代码和终端的字体可以自选（比如提示符画图标用的 Nerd Font），代码、界面、终端字号分别可调。
 - 所有操作都有快捷键，应用内按 `⌘/`（Windows 上是 `Ctrl+/`）查看全部。
 
 ## 截图
@@ -77,7 +77,7 @@ AI 写的代码越来越多，同事也在不停地推提交，每天花在看 d
 
 **[下载 DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg)**（经过 Apple 签名和公证，会自动更新），打开安装包按提示安装即可。官网：[ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/zh/)。
 
-需要 macOS 14 Sonoma 及以上、Apple Silicon 的 Mac（Intel 未测试）。想在终端里打开仓库，先链接一次 `dif` 命令：
+需要 macOS 14 Sonoma 及以上。上面的安装包适用于 Apple Silicon 的 Mac；Intel 处理器的 Mac 请改下 [`DiffCode-Intel.pkg`](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg)（苹果菜单 →「关于本机」可以看到是哪种）。想在终端里打开仓库，先链接一次 `dif` 命令：
 
 ```bash
 sudo ln -sf /Applications/DiffCode.app/Contents/Resources/dif /usr/local/bin/dif

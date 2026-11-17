@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://ihou.github.io/DiffCode/"><b>Website</b></a> · Download for <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>Mac</b></a> or <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe"><b>Windows</b></a> (4 MB)<br>
+  <a href="https://ihou.github.io/DiffCode/"><b>Website</b></a> · Download for <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg"><b>Mac</b></a>, <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg"><b>Intel Mac</b></a> or <a href="https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Setup-x64.exe"><b>Windows</b></a> (4 MB)<br>
   English · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
@@ -55,7 +55,7 @@ Coding agents write more of the code now, and teammates keep pushing theirs, so 
 - Stashes, blame (annotate) with commit details on hover, history of a file or of the selected lines, and *Compare with Branch* to review everything an agent did since it branched off — committed and uncommitted together.
 
 **Everything else**
-- Dark, light or system appearance. English or Simplified Chinese interface. Separate font sizes for code, interface and terminal.
+- Dark, light or system appearance. English or Simplified Chinese interface. Your choice of font for code and for the terminal (say, the Nerd Font your prompt draws its icons with), and separate font sizes for code, interface and terminal.
 - A shortcut for everything. Press `⌘/` in the app to see them all.
 
 ## Screenshots
@@ -77,7 +77,7 @@ The repositories in the screenshots are made up for the purpose.
 
 **[Download DiffCode](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode.pkg)** (signed and notarized by Apple, updates itself) and open the installer. The website is at [ihou.github.io/DiffCode](https://ihou.github.io/DiffCode/).
 
-It needs macOS 14 Sonoma or later on an Apple Silicon Mac (Intel Macs are untested). To open repositories from the terminal, link the `dif` command once:
+It needs macOS 14 Sonoma or later. That download is for Macs with Apple Silicon; on an Intel Mac, download [`DiffCode-Intel.pkg`](https://github.com/ihou/DiffCode/releases/latest/download/DiffCode-Intel.pkg) instead (Apple menu → About This Mac shows which you have). To open repositories from the terminal, link the `dif` command once:
 
 ```bash
 sudo ln -sf /Applications/DiffCode.app/Contents/Resources/dif /usr/local/bin/dif
