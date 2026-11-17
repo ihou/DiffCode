@@ -709,10 +709,13 @@ enum DiffLoader {
         }
     }
 
-    /// Said over a diff with no differences in it, when both sides exist.
+    /// Said over a diff with no differences in it, when both sides exist. The lines can be the same while the bytes
+    /// are not: line endings git converts (`core.autocrlf`), or the same text in another encoding.
     static func note(hunks: [Hunk], old: Data?, new: Data?, ignoreWhitespace: Bool) -> String? {
         guard hunks.isEmpty, let old, let new else { return nil }
-        return old == new || !ignoreWhitespace ? L("Contents are identical", "内容完全相同") : L("Only whitespace differs", "仅空白字符不同")
+        if old == new { return L("Contents are identical", "内容完全相同") }
+        return ignoreWhitespace ? L("Only whitespace differs", "仅空白字符不同")
+                                : L("Only line endings or encoding differ", "仅换行符或编码不同")
     }
 
     private static func makeRightSide(_ data: Data?, _ language: LanguageSpec, worktree url: URL?, base: Data?) async -> (TextBuffer, EditInfo?) {
@@ -763,7 +766,10 @@ enum DiffLoader {
 
     /// Line-level hunks via `git diff --no-index` on the exact bytes being displayed, so the
     /// hunks always agree with the text on screen regardless of filters, renames or repo state.
-    static func computeHunks(old: Data?, new: Data?, ignoreWhitespace: Bool) async -> [Hunk]? {
+    /// Nil when git could not compare them.
+    /// - Parameter environment: added to git's (tests give it settings of their own).
+    static func computeHunks(old: Data?, new: Data?, ignoreWhitespace: Bool,
+                             environment: [String: String] = [:]) async -> [Hunk]? {
         guard var old, var new else { return [] }
         if old == new { return [] }
         // Git takes UTF-16 for binary (it is full of zero bytes). As UTF-8 the lines are the same lines.
@@ -785,10 +791,16 @@ enum DiffLoader {
         } catch {
             return nil
         }
-        var args = ["diff", "--no-index", "--no-color", "--no-ext-diff", "-U0", "--diff-algorithm=histogram"]
+        // DiffCode shows these files as text. The user's own gitattributes still apply to them: without `--text` a
+        // rule such as `*.a binary` (in common templates) has git call them binary, and a textconv driver would compare
+        // something else than what is shown.
+        var args = ["diff", "--no-index", "--no-color", "--no-ext-diff", "--no-textconv", "--text", "-U0",
+                    "--diff-algorithm=histogram"]
         if ignoreWhitespace { args.append("-w") }
         args += [a.lastPathComponent, b.lastPathComponent]
-        guard let output = try? await Git.run(args, in: scratch, okStatuses: [0, 1]) else { return nil }
-        return DiffParser.parseHunks(output).hunks
+        guard let output = try? await Git.run(args, in: scratch, okStatuses: [0, 1], environment: environment) else { return nil }
+        let parsed = DiffParser.parseHunks(output)
+        // Files git did not compare line by line are not files without differences.
+        return parsed.binary ? nil : parsed.hunks
     }
 }

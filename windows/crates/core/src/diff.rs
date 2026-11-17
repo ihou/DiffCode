@@ -1067,16 +1067,20 @@ pub fn add_inline_highlights(hunks: &mut [Hunk], left: &[String], right: &[Strin
     }
 }
 
-/// Said over a diff with no differences in it, when both sides exist.
+/// Said over a diff with no differences in it, when both sides exist. The lines can be the same while the bytes are
+/// not: line endings git converts (`core.autocrlf`, on by default in Git for Windows), or the same text in another
+/// encoding.
 pub fn note(hunks: &[Hunk], old: Option<&[u8]>, new: Option<&[u8]>, ignore_whitespace: bool) -> Option<String> {
     let (Some(old), Some(new)) = (old, new) else { return None };
     if !hunks.is_empty() {
         return None;
     }
-    Some(if old == new || !ignore_whitespace {
+    Some(if old == new {
         l("Contents are identical", "内容完全相同")
-    } else {
+    } else if ignore_whitespace {
         l("Only whitespace differs", "仅空白字符不同")
+    } else {
+        l("Only line endings or encoding differ", "仅换行符或编码不同")
     })
 }
 
@@ -1142,7 +1146,18 @@ fn make_buffer(data: Option<&[u8]>, language: &'static LanguageSpec) -> TextBuff
 
 /// Line-level hunks via `git diff --no-index` on the exact bytes being displayed, so the
 /// hunks always agree with the text on screen regardless of filters, renames or repo state.
+/// None when git could not compare them.
 pub fn compute_hunks(old: Option<&[u8]>, new: Option<&[u8]>, ignore_whitespace: bool) -> Option<Vec<Hunk>> {
+    compute_hunks_with(old, new, ignore_whitespace, &[])
+}
+
+/// `compute_hunks` with `env` added to git's environment (tests give it settings of their own).
+fn compute_hunks_with(
+    old: Option<&[u8]>,
+    new: Option<&[u8]>,
+    ignore_whitespace: bool,
+    env: &[(&str, &str)],
+) -> Option<Vec<Hunk>> {
     let (Some(old), Some(new)) = (old, new) else { return Some(Vec::new()) };
     if old == new {
         return Some(Vec::new());
@@ -1174,18 +1189,35 @@ pub fn compute_hunks(old: Option<&[u8]>, new: Option<&[u8]>, ignore_whitespace: 
     std::fs::create_dir_all(scratch).ok()?;
     std::fs::write(&pa, old).ok()?;
     std::fs::write(&pb, new).ok()?;
-    let mut args: Vec<String> =
-        ["diff", "--no-index", "--no-color", "--no-ext-diff", "-U0", "--diff-algorithm=histogram"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+    // DiffCode shows these files as text. The user's own gitattributes still apply to them: without `--text` a rule
+    // such as `*.a binary` (in common templates) has git call them binary, and a textconv driver would compare
+    // something else than what is shown.
+    let mut args: Vec<String> = [
+        "diff",
+        "--no-index",
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        "--text",
+        "-U0",
+        "--diff-algorithm=histogram",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
     if ignore_whitespace {
         args.push("-w".into());
     }
     args.push(a);
     args.push(b);
-    let output = git::cmd(scratch, args).ok(&[0, 1]).run().ok()?;
-    Some(parse_hunks(&output).0)
+    let mut command = git::cmd(scratch, args).ok(&[0, 1]);
+    for (key, value) in env {
+        command = command.env(key, *value);
+    }
+    let output = command.run().ok()?;
+    let (hunks, binary) = parse_hunks(&output);
+    // Files git did not compare line by line are not files without differences.
+    (!binary).then_some(hunks)
 }
 
 #[cfg(test)]
@@ -1275,6 +1307,43 @@ mod tests {
         }
         let hunks = compute_hunks(Some(b"a\nb\nc\n"), Some(b"a\nB\nc\nd\n"), false).unwrap();
         assert_eq!(hunks, vec![Hunk::lines(1, 1, 1, 1), Hunk::lines(3, 0, 3, 1)]);
+    }
+
+    /// Issue #4: the user's own gitattributes apply to the scratch files git compares. One that called them binary
+    /// left no hunks, shown as "Contents are identical".
+    #[test]
+    fn the_users_gitattributes_do_not_hide_changes() {
+        if !git::is_available() {
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let settings = |name: &str, attributes: &str, config: &str| {
+            let attributes_file = dir.path().join(format!("{name}.attributes"));
+            let config_file = dir.path().join(format!("{name}.config"));
+            std::fs::write(&attributes_file, attributes).unwrap();
+            // Forward slashes: a backslash starts an escape in git's settings files.
+            let path = attributes_file.to_string_lossy().replace('\\', "/");
+            std::fs::write(&config_file, format!("[core]\n\tattributesFile = {path}\n{config}")).unwrap();
+            config_file.to_string_lossy().into_owned()
+        };
+        let (old, new) = (&b"fdsf\n"[..], &b"fdsf1111\ndfxxs\n"[..]);
+        let expected = Some(vec![Hunk::lines(0, 1, 0, 2)]);
+
+        let binary = settings("binary", "*.a binary\n", "");
+        assert_eq!(compute_hunks_with(Some(old), Some(new), false, &[("GIT_CONFIG_GLOBAL", &binary)]), expected);
+
+        // A textconv driver that turns everything into nothing would make any two files the same.
+        let textconv = settings("textconv", "* diff=nothing\n", "[diff \"nothing\"]\n\ttextconv = true\n");
+        assert_eq!(compute_hunks_with(Some(old), Some(new), false, &[("GIT_CONFIG_GLOBAL", &textconv)]), expected);
+    }
+
+    #[test]
+    fn different_bytes_are_not_called_identical() {
+        let identical = note(&[], Some(b"a\n"), Some(b"a\n"), false);
+        let line_endings = note(&[], Some(b"a\n"), Some(b"a\r\n"), false);
+        assert!(identical.is_some() && line_endings.is_some());
+        assert_ne!(line_endings, identical);
+        assert_eq!(note(&[Hunk::lines(0, 1, 0, 1)], Some(b"a\n"), Some(b"b\n"), false), None);
     }
 
     #[test]

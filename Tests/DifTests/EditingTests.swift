@@ -346,4 +346,39 @@ final class WorkingTreeDiffTests: XCTestCase {
         let same = await DiffLoader.computeHunks(old: utf16("x\n"), new: Data("x\n".utf8), ignoreWhitespace: false)
         XCTAssertEqual(same, [], "the same lines in another encoding are not a change of lines")
     }
+
+    /// Issue #4: the user's own gitattributes apply to the scratch files git compares. One that called them binary
+    /// left no hunks, shown as "Contents are identical".
+    func testTheUsersGitattributesDoNotHideChanges() async throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("dif-attributes-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        func settings(_ name: String, attributes: String, config: String = "") throws -> [String: String] {
+            let attributesFile = dir.appendingPathComponent("\(name).attributes"), configFile = dir.appendingPathComponent("\(name).config")
+            try Data(attributes.utf8).write(to: attributesFile)
+            try Data("[core]\n\tattributesFile = \(attributesFile.path)\n\(config)".utf8).write(to: configFile)
+            return ["GIT_CONFIG_GLOBAL": configFile.path]
+        }
+        let old = Data("fdsf\n".utf8), new = Data("fdsf1111\ndfxxs\n".utf8)
+        let expected = [Hunk(leftStart: 0, leftCount: 1, rightStart: 0, rightCount: 2)]
+
+        let binary = try settings("binary", attributes: "*.a binary\n")
+        let hunks = await DiffLoader.computeHunks(old: old, new: new, ignoreWhitespace: false, environment: binary)
+        XCTAssertEqual(hunks, expected)
+
+        // A textconv driver that turns everything into nothing would make any two files the same.
+        let textconv = try settings("textconv", attributes: "* diff=nothing\n", config: "[diff \"nothing\"]\n\ttextconv = true\n")
+        let converted = await DiffLoader.computeHunks(old: old, new: new, ignoreWhitespace: false, environment: textconv)
+        XCTAssertEqual(converted, expected)
+    }
+
+    func testDifferentBytesAreNotCalledIdentical() {
+        let identical = DiffLoader.note(hunks: [], old: Data("a\n".utf8), new: Data("a\n".utf8), ignoreWhitespace: false)
+        let lineEndings = DiffLoader.note(hunks: [], old: Data("a\n".utf8), new: Data("a\r\n".utf8), ignoreWhitespace: false)
+        XCTAssertNotNil(identical)
+        XCTAssertNotNil(lineEndings)
+        XCTAssertNotEqual(lineEndings, identical)
+        XCTAssertNil(DiffLoader.note(hunks: [Hunk(leftStart: 0, leftCount: 1, rightStart: 0, rightCount: 1)],
+                                     old: Data("a\n".utf8), new: Data("b\n".utf8), ignoreWhitespace: false))
+    }
 }
