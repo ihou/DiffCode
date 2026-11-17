@@ -166,7 +166,7 @@ private struct ProjectRow: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .help(collapsed ? L("Show the repositories inside", "展开子仓库") : L("Hide the repositories inside", "折叠子仓库"))
+                        .help(collapsed ? L("Expand", "展开") : L("Collapse", "折叠"))
                     } else {
                         Color.clear
                     }
@@ -224,8 +224,8 @@ private struct ProjectRow: View {
         .onTapGesture { store.select(project) }
         .onHover { hovering = $0 }
         .help(collapsed && changes > project.changes.count
-              ? project.url.path + "\n" + L("\(changes - project.changes.count) changes in the repositories inside",
-                                             "子仓库里有 \(changes - project.changes.count) 处改动")
+              ? project.url.path + "\n" + L("\(changes - project.changes.count) changes folded away under it",
+                                             "折叠起来的项目里有 \(changes - project.changes.count) 处改动")
               : (project.worktreeOf != nil ? L("Work tree", "工作树") + " · " + project.url.path : project.url.path))
         .contextMenu {
             Button(L("Reveal in Finder", "在 Finder 中显示")) { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }

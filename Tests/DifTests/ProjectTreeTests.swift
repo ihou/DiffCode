@@ -29,8 +29,9 @@ final class ProjectTreeTests: XCTestCase {
         let paths = ["/w/ws", "/w/ws/api", "/elsewhere/fix-login", "/w/ws/api/.claude/worktrees/task"]
         let owners: [Int?] = [nil, nil, 1, 0]
         XCTAssertEqual(ProjectTree.parents(paths, owners: owners), [nil, 0, 1, 0])
-        XCTAssertEqual(ProjectTree.rows(paths: paths, owners: owners).map(\.index), [0, 1, 2, 3])
-        XCTAssertEqual(ProjectTree.rows(paths: paths, owners: owners, collapsed: ["/w/ws/api"]).map(\.index), [0, 1, 3])
+        // A repository's work trees come before the repositories inside it.
+        XCTAssertEqual(ProjectTree.rows(paths: paths, owners: owners).map(\.index), [0, 3, 1, 2])
+        XCTAssertEqual(ProjectTree.rows(paths: paths, owners: owners, collapsed: ["/w/ws/api"]).map(\.index), [0, 3, 1])
         XCTAssertEqual(ProjectTree.descendants(of: 0, parents: ProjectTree.parents(paths, owners: owners)), [1, 2, 3])
     }
 

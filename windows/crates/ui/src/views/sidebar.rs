@@ -113,7 +113,7 @@ fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect, tree: proje
     let count = p.changes().len() + hidden;
     if hidden > 0 {
         path.push('\n');
-        path.push_str(&lf!("{hidden} changes in the repositories inside", "子仓库里有 {hidden} 处改动"));
+        path.push_str(&lf!("{hidden} changes folded away under it", "折叠起来的项目里有 {hidden} 处改动"));
     }
     let r = ui.interact(Id::new("project-row").with(id), row);
     let fill = if selected {
@@ -136,7 +136,7 @@ fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect, tree: proje
             let s = t.s(10.0);
             let icon = if collapsed { Icon::ChevronRight } else { Icon::ChevronDown };
             ui.icon(icon, Rect::new(gutter.center().x - s / 2.0, gutter.center().y - s / 2.0, s, s), if hit.hovered { t.text } else { t.text3 });
-            ui.tooltip(&hit, &if collapsed { l("Show the repositories inside", "展开子仓库") } else { l("Hide the repositories inside", "折叠子仓库") });
+            ui.tooltip(&hit, &if collapsed { l("Expand", "展开") } else { l("Collapse", "折叠") });
             arrow_hit = hit.hovered;
             if hit.clicked {
                 app.toggle_collapsed(id);

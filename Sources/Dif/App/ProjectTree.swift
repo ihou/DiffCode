@@ -26,12 +26,17 @@ enum ProjectTree {
         }
     }
 
-    /// The rows to show, top to bottom: each project followed by those inside it, in the list's own order.
+    /// The rows to show, top to bottom: each project followed by its work trees and then the repositories inside it.
     /// What is inside a collapsed project is left out.
     static func rows(paths: [String], owners: [Int?] = [], collapsed: Set<String> = []) -> [Row] {
         let parents = parents(paths, owners: owners)
         var children: [Int?: [Int]] = [:]
         for (index, parent) in parents.enumerated() { children[parent, default: []].append(index) }
+        // A repository's own work trees first, then the repositories inside it; each kind in the list's order.
+        func isWorktree(_ index: Int) -> Bool { index < owners.count && owners[index] != nil }
+        for (parent, inside) in children where parent != nil {
+            children[parent] = inside.filter(isWorktree) + inside.filter { !isWorktree($0) }
+        }
         var rows: [Row] = []
         func add(_ index: Int, depth: Int) {
             let inside = children[index] ?? []

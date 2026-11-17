@@ -34,23 +34,29 @@ pub fn parents(keys: &[String], owners: &[Option<usize>]) -> Vec<Option<usize>> 
         .collect()
 }
 
-/// The rows to show, top to bottom: each project followed by those inside it, in the list's own order. What is
-/// inside a collapsed project is left out.
+/// The rows to show, top to bottom: each project followed by its work trees and then the repositories inside it.
+/// What is inside a collapsed project is left out.
 pub fn rows(keys: &[String], owners: &[Option<usize>], collapsed: &[String]) -> Vec<Row> {
     let parents = parents(keys, owners);
-    fn add(index: usize, depth: usize, keys: &[String], parents: &[Option<usize>], collapsed: &[String], rows: &mut Vec<Row>) {
-        let children: Vec<usize> = (0..keys.len()).filter(|i| parents[*i] == Some(index)).collect();
+    type Ctx<'a> = (&'a [String], &'a [Option<usize>], &'a [Option<usize>], &'a [String]);
+    fn add(index: usize, depth: usize, ctx: Ctx, rows: &mut Vec<Row>) {
+        let (keys, parents, owners, collapsed) = ctx;
+        // A repository's own work trees first, then the repositories inside it; each kind in the list's order.
+        let is_worktree = |i: &usize| owners.get(*i).copied().flatten().is_some();
+        let inside: Vec<usize> = (0..keys.len()).filter(|i| parents[*i] == Some(index)).collect();
+        let children: Vec<usize> =
+            inside.iter().copied().filter(|i| is_worktree(i)).chain(inside.iter().copied().filter(|i| !is_worktree(i))).collect();
         rows.push(Row { index, depth, has_children: !children.is_empty(), parent: parents[index] });
         if collapsed.contains(&keys[index]) {
             return;
         }
         for child in children {
-            add(child, depth + 1, keys, parents, collapsed, rows);
+            add(child, depth + 1, ctx, rows);
         }
     }
     let mut rows = Vec::new();
     for root in (0..keys.len()).filter(|i| parents[*i].is_none()) {
-        add(root, 0, keys, &parents, collapsed, &mut rows);
+        add(root, 0, (keys, &parents, owners, collapsed), &mut rows);
     }
     rows
 }
@@ -118,7 +124,8 @@ mod tests {
         let owners = [None, None, Some(1), Some(0)];
         assert_eq!(parents(&keys, &owners), vec![None, Some(0), Some(1), Some(0)]);
         let shown = |collapsed: &[String]| -> Vec<usize> { rows(&keys, &owners, collapsed).iter().map(|r| r.index).collect() };
-        assert_eq!(shown(&[]), vec![0, 1, 2, 3]);
-        assert_eq!(shown(&[keys[1].clone()]), vec![0, 1, 3]);
+        // A repository's work trees come before the repositories inside it.
+        assert_eq!(shown(&[]), vec![0, 3, 1, 2]);
+        assert_eq!(shown(&[keys[1].clone()]), vec![0, 3, 1]);
     }
 }
