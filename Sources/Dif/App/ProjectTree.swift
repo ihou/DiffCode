@@ -1,6 +1,7 @@
 import Foundation
 
-/// The projects as a tree: a repository inside another one listed sits under it. Worked out from the paths alone,
+/// The projects as a tree: a repository inside another one listed sits under it, and so does a linked work tree
+/// under its repository, wherever its folder is. Worked out from the paths and from what git says of work trees,
 /// so the list stays a plain list of folders and nothing has to be kept in step.
 enum ProjectTree {
     struct Row: Equatable {
@@ -12,9 +13,11 @@ enum ProjectTree {
         var parent: Int?
     }
 
-    /// For each path, the index of the nearest listed folder that contains it.
-    static func parents(_ paths: [String]) -> [Int?] {
+    /// For each path, the index of the nearest listed folder that contains it; a work tree's repository
+    /// (`owners`, by index) comes before where its folder is.
+    static func parents(_ paths: [String], owners: [Int?] = []) -> [Int?] {
         paths.indices.map { i in
+            if i < owners.count, let owner = owners[i], owner != i { return owner }
             var best: Int?
             for j in paths.indices where j != i && paths[i].hasPrefix(paths[j] + "/") {
                 if best == nil || paths[j].count > paths[best!].count { best = j }
@@ -25,8 +28,8 @@ enum ProjectTree {
 
     /// The rows to show, top to bottom: each project followed by those inside it, in the list's own order.
     /// What is inside a collapsed project is left out.
-    static func rows(paths: [String], collapsed: Set<String> = []) -> [Row] {
-        let parents = parents(paths)
+    static func rows(paths: [String], owners: [Int?] = [], collapsed: Set<String> = []) -> [Row] {
+        let parents = parents(paths, owners: owners)
         var children: [Int?: [Int]] = [:]
         for (index, parent) in parents.enumerated() { children[parent, default: []].append(index) }
         var rows: [Row] = []
@@ -40,8 +43,27 @@ enum ProjectTree {
         return rows
     }
 
-    /// Everything under a path, however deep (indices).
-    static func descendants(of index: Int, in paths: [String]) -> [Int] {
-        paths.indices.filter { $0 != index && paths[$0].hasPrefix(paths[index] + "/") }
+    /// Everything under a project, however deep (indices), given each one's parent.
+    static func descendants(of index: Int, parents: [Int?]) -> [Int] {
+        parents.indices.filter { candidate in
+            var at = parents[candidate], steps = 0
+            while let up = at, steps <= parents.count {
+                if up == index { return true }
+                at = parents[up]
+                steps += 1
+            }
+            return false
+        }
+    }
+
+    /// The projects above one, nearest first.
+    static func ancestors(of index: Int, parents: [Int?]) -> [Int] {
+        var found: [Int] = []
+        var at = parents[index]
+        while let up = at, found.count <= parents.count {
+            found.append(up)
+            at = parents[up]
+        }
+        return found
     }
 }

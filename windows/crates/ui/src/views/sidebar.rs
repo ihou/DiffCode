@@ -95,15 +95,20 @@ fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect, tree: proje
     let parent_key = parent.and_then(|p| app.project(p)).map(|p| project_tree::key(&p.url));
     let Some(p) = app.project(id) else { return };
     let avatar_name = p.name.clone();
-    // Under its parent a repository goes by its path from there ("services/core").
+    let (worktree, derived) = (p.worktree_of.is_some(), p.is_derived);
+    // Under its parent a repository goes by its path from there ("services/core"); a work tree by its folder's
+    // name, wherever that folder is.
     let name = match &parent_key {
-        Some(parent) if project_tree::key(&p.url).starts_with(&(parent.clone() + "/")) => {
+        Some(parent) if !worktree && project_tree::key(&p.url).starts_with(&(parent.clone() + "/")) => {
             let full = p.url.to_string_lossy().replace('\\', "/");
             full.trim_end_matches('/').chars().skip(parent.chars().count() + 1).collect::<String>()
         }
         _ => p.name.clone(),
     };
     let mut path = p.url.to_string_lossy().to_string();
+    if worktree {
+        path = format!("{} · {path}", l("Work tree", "工作树"));
+    }
     let error = p.error_message.clone();
     let count = p.changes().len() + hidden;
     if hidden > 0 {
@@ -140,7 +145,14 @@ fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect, tree: proje
         left = gutter.right() + t.s(3.0);
     }
     let avatar = t.s(24.0);
-    components::avatar(ui, Rect::new(left, row.center().y - avatar / 2.0, avatar, avatar), &avatar_name);
+    let mark = Rect::new(left, row.center().y - avatar / 2.0, avatar, avatar);
+    if worktree {
+        // A work tree of the repository above, not a repository of its own: a quiet mark, no monogram.
+        ui.round(mark, avatar * 0.28, t.chip);
+        ui.icon(Icon::Copy, mark.inset(t.s(6.0)), t.text2);
+    } else {
+        components::avatar(ui, mark, &avatar_name);
+    }
     let text_x = left + avatar + t.s(9.0);
     let mut right = row.right() - t.s(8.0);
 
@@ -182,7 +194,7 @@ fn project_row(app: &mut App, ui: &mut Ui, id: ProjectId, row: Rect, tree: proje
         app.select(id);
     }
     if r.secondary {
-        project_menu(app, id, ui.mouse(), tree.has_children);
+        project_menu(app, id, ui.mouse(), tree.has_children, derived);
     }
 }
 
@@ -264,7 +276,7 @@ fn branch_label(app: &mut App, ui: &mut Ui, id: ProjectId, rect: Rect) -> bool {
     r.hovered
 }
 
-fn project_menu(app: &mut App, id: ProjectId, at: Point, has_children: bool) {
+fn project_menu(app: &mut App, id: ProjectId, at: Point, has_children: bool, derived: bool) {
     let Some(p) = app.project(id) else { return };
     let url = p.url.clone();
     let (up, down) = (app.can_move_project(id, -1), app.can_move_project(id, 1));
@@ -280,12 +292,15 @@ fn project_menu(app: &mut App, id: ProjectId, at: Point, has_children: bool) {
         let title = if collapsed { l("Expand", "展开") } else { l("Collapse", "折叠") };
         items.push(MenuItem::new(title, move |app| app.toggle_collapsed(id)));
     }
-    items.extend([
-        MenuItem::new(l("Move Up", "上移"), move |app| app.move_project(id, -1)).disabled(!up),
-        MenuItem::new(l("Move Down", "下移"), move |app| app.move_project(id, 1)).disabled(!down),
-        MenuItem::separator(),
-        MenuItem::new(l("Remove from DiffCode", "从 DiffCode 中移除"), move |app| app.remove_project(id)),
-    ]);
+    // A work tree git lists follows git: nothing to order or to remove here.
+    if !derived {
+        items.extend([
+            MenuItem::new(l("Move Up", "上移"), move |app| app.move_project(id, -1)).disabled(!up),
+            MenuItem::new(l("Move Down", "下移"), move |app| app.move_project(id, 1)).disabled(!down),
+            MenuItem::separator(),
+            MenuItem::new(l("Remove from DiffCode", "从 DiffCode 中移除"), move |app| app.remove_project(id)),
+        ]);
+    }
     app.open_menu(at, items);
 }
 

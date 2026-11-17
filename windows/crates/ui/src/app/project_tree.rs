@@ -1,4 +1,5 @@
-//! The projects as a tree: a repository inside another one listed sits under it. Worked out from the paths alone,
+//! The projects as a tree: a repository inside another one listed sits under it, and so does a linked work tree
+//! under its repository, wherever its folder is. Worked out from the paths and from what git says of work trees,
 //! so the list stays a plain list of folders and nothing has to be kept in step.
 
 use std::path::Path;
@@ -22,17 +23,21 @@ fn inside(path: &str, folder: &str) -> bool {
     path.len() > folder.len() + 1 && path.starts_with(folder) && path.as_bytes()[folder.len()] == b'/'
 }
 
-/// For each path, the index of the nearest listed folder that contains it.
-pub fn parents(keys: &[String]) -> Vec<Option<usize>> {
+/// For each path, the index of the nearest listed folder that contains it; a work tree's repository (`owners`, by
+/// index) comes before where its folder is.
+pub fn parents(keys: &[String], owners: &[Option<usize>]) -> Vec<Option<usize>> {
     (0..keys.len())
-        .map(|i| (0..keys.len()).filter(|j| *j != i && inside(&keys[i], &keys[*j])).max_by_key(|j| keys[*j].len()))
+        .map(|i| match owners.get(i).copied().flatten() {
+            Some(owner) if owner != i => Some(owner),
+            _ => (0..keys.len()).filter(|j| *j != i && inside(&keys[i], &keys[*j])).max_by_key(|j| keys[*j].len()),
+        })
         .collect()
 }
 
 /// The rows to show, top to bottom: each project followed by those inside it, in the list's own order. What is
 /// inside a collapsed project is left out.
-pub fn rows(keys: &[String], collapsed: &[String]) -> Vec<Row> {
-    let parents = parents(keys);
+pub fn rows(keys: &[String], owners: &[Option<usize>], collapsed: &[String]) -> Vec<Row> {
+    let parents = parents(keys, owners);
     fn add(index: usize, depth: usize, keys: &[String], parents: &[Option<usize>], collapsed: &[String], rows: &mut Vec<Row>) {
         let children: Vec<usize> = (0..keys.len()).filter(|i| parents[*i] == Some(index)).collect();
         rows.push(Row { index, depth, has_children: !children.is_empty(), parent: parents[index] });
@@ -50,9 +55,23 @@ pub fn rows(keys: &[String], collapsed: &[String]) -> Vec<Row> {
     rows
 }
 
-/// Everything under a path, however deep (indices).
-pub fn descendants(index: usize, keys: &[String]) -> Vec<usize> {
-    (0..keys.len()).filter(|i| *i != index && inside(&keys[*i], &keys[index])).collect()
+/// The projects above one, nearest first.
+pub fn ancestors(index: usize, parents: &[Option<usize>]) -> Vec<usize> {
+    let mut found = Vec::new();
+    let mut at = parents[index];
+    while let Some(up) = at {
+        if found.len() > parents.len() {
+            break;
+        }
+        found.push(up);
+        at = parents[up];
+    }
+    found
+}
+
+/// Everything under a project, however deep (indices), given each one's parent.
+pub fn descendants(index: usize, parents: &[Option<usize>]) -> Vec<usize> {
+    (0..parents.len()).filter(|i| ancestors(*i, parents).contains(&index)).collect()
 }
 
 #[cfg(test)]
@@ -70,8 +89,8 @@ mod tests {
     fn a_repository_inside_another_sits_under_it() {
         let keys = keys();
         // A name that merely starts the same is no parent, and the nearest folder is.
-        assert_eq!(parents(&keys), vec![None, None, Some(0), Some(0), Some(2), None]);
-        let shown: Vec<(usize, usize)> = rows(&keys, &[]).iter().map(|r| (r.index, r.depth)).collect();
+        assert_eq!(parents(&keys, &[]), vec![None, None, Some(0), Some(0), Some(2), None]);
+        let shown: Vec<(usize, usize)> = rows(&keys, &[], &[]).iter().map(|r| (r.index, r.depth)).collect();
         assert_eq!(shown, vec![(0, 0), (2, 1), (4, 2), (3, 1), (1, 0), (5, 0)]);
     }
 
@@ -80,11 +99,26 @@ mod tests {
         let keys = keys();
         let shown = |collapsed: &[&str]| -> Vec<usize> {
             let collapsed: Vec<String> = collapsed.iter().map(|p| key(Path::new(p))).collect();
-            rows(&keys, &collapsed).iter().map(|r| r.index).collect()
+            rows(&keys, &[], &collapsed).iter().map(|r| r.index).collect()
         };
         assert_eq!(shown(&["C:\\w\\ws\\api"]), vec![0, 2, 3, 1, 5]);
         assert_eq!(shown(&["C:\\w\\ws"]), vec![0, 1, 5]);
-        assert!(rows(&keys, &[key(Path::new("C:\\w\\ws"))])[0].has_children);
-        assert_eq!(descendants(0, &keys), vec![2, 3, 4]);
+        assert!(rows(&keys, &[], &[key(Path::new("C:\\w\\ws"))])[0].has_children);
+        assert_eq!(descendants(0, &parents(&keys, &[])), vec![2, 3, 4]);
+        assert_eq!(ancestors(4, &parents(&keys, &[])), vec![2, 0]);
+    }
+
+    /// A linked work tree sits under its repository wherever its folder is: beside it, or inside another project.
+    #[test]
+    fn a_work_tree_sits_under_its_repository() {
+        let keys: Vec<String> = ["C:\\w\\ws", "C:\\w\\ws\\api", "D:\\elsewhere\\fix", "C:\\w\\ws\\api\\.claude\\worktrees\\task"]
+            .iter()
+            .map(|p| key(Path::new(p)))
+            .collect();
+        let owners = [None, None, Some(1), Some(0)];
+        assert_eq!(parents(&keys, &owners), vec![None, Some(0), Some(1), Some(0)]);
+        let shown = |collapsed: &[String]| -> Vec<usize> { rows(&keys, &owners, collapsed).iter().map(|r| r.index).collect() };
+        assert_eq!(shown(&[]), vec![0, 1, 2, 3]);
+        assert_eq!(shown(&[keys[1].clone()]), vec![0, 1, 3]);
     }
 }

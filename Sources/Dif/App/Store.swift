@@ -37,6 +37,8 @@ final class AppStore {
     var projects: [Project] = []
     /// The projects whose repositories inside are folded away in the sidebar, by path.
     var collapsedProjects: Set<String> = []
+    /// The work tree that was selected when DiffCode last quit, until git lists it again.
+    @ObservationIgnored private var awaitedSelection: String?
     var selectedProjectID: UUID? { didSet { if selectedProjectID != oldValue { terminals.updatePolling() } } }
     var popup: Popup?
     var sidebarVisible = true
@@ -128,6 +130,8 @@ final class AppStore {
         }
         collapsedProjects = Set(defaults.stringArray(forKey: "collapsedProjects") ?? [])
         let last = defaults.string(forKey: "selectedProject")
+        // A work tree was selected: it is listed once its repository has been asked for its work trees.
+        if let last, !projects.contains(where: { $0.url.path == last }) { awaitedSelection = last }
         selectedProjectID = (projects.first { $0.url.path == last } ?? projects.first)?.id
         projects.forEach { $0.refresh() }
         syncViewer()
@@ -177,7 +181,8 @@ final class AppStore {
 
     private func persistProjects() {
         let defaults = UserDefaults.standard
-        defaults.set(projects.map(\.url.path), forKey: "projects")
+        // Work trees listed by git are not the user's list: they come back from git.
+        defaults.set(projects.filter { !$0.isDerived }.map(\.url.path), forKey: "projects")
         defaults.set(currentProject?.url.path, forKey: "selectedProject")
         // Only what is still listed, so the setting does not grow with every folder ever collapsed.
         defaults.set(projects.map(\.url.path).filter(collapsedProjects.contains), forKey: "collapsedProjects")
@@ -249,6 +254,8 @@ final class AppStore {
                         guard await self.requestAccess(to: root) else { continue }
                     }
                     if let existing = self.projects.first(where: { $0.url.path == path }) {
+                        // A work tree git listed, now added by hand: it stays whatever happens to the list.
+                        existing.isDerived = false
                         self.unlockGrantedProjects()
                         landed = landed ?? existing
                         continue
@@ -278,6 +285,7 @@ final class AppStore {
     /// added, put right below it. Only this one looks for repositories; the other refreshes stay as light as they were.
     func refreshAndDiscover(_ project: Project) {
         project.refresh()
+        if project.gitDirectory != nil { syncWorktrees(of: project, force: true) }
         Task { @MainActor in
             let found = await Git.repositories(for: project.url)
             guard self.projects.contains(where: { $0.id == project.id }) else { return }
@@ -303,12 +311,19 @@ final class AppStore {
     }
 
     func remove(_ project: Project) {
+        // The work trees listed under it go with it; those the user added stay, on their own.
+        for worktree in projects where worktree.worktreeOf == project.id {
+            worktree.worktreeOf = nil
+            if worktree.isDerived { remove(worktree) }
+        }
         terminals.removeAll(for: project)
         project.stopWatching()
         projects.removeAll { $0.id == project.id }
         FolderAccess.shared.release(project.url.path, keepingFor: projects.map(\.url.path))
         if selectedProjectID == project.id {
-            selectedProjectID = projects.first?.id
+            // A work tree that went: back to its repository.
+            let owner = project.worktreeOf.flatMap { id in projects.first { $0.id == id } }
+            selectedProjectID = (owner ?? projects.first)?.id
             syncViewer()
         }
         persistProjects()
@@ -316,14 +331,21 @@ final class AppStore {
 
     // MARK: The projects as a tree
 
-    /// The sidebar's rows: a repository inside another one listed sits under it.
+    /// For each project, the one it sits under: the repository of a work tree, or the listed folder it is inside.
+    private var projectParents: [Int?] {
+        let owners = projects.map { project in project.worktreeOf.flatMap { id in projects.firstIndex { $0.id == id } } }
+        return ProjectTree.parents(projects.map(\.url.path), owners: owners)
+    }
+
+    /// The sidebar's rows: a repository inside another one listed sits under it, a work tree under its repository.
     var projectRows: [ProjectTree.Row] {
-        ProjectTree.rows(paths: projects.map(\.url.path), collapsed: collapsedProjects)
+        let owners = projects.map { project in project.worktreeOf.flatMap { id in projects.firstIndex { $0.id == id } } }
+        return ProjectTree.rows(paths: projects.map(\.url.path), owners: owners, collapsed: collapsedProjects)
     }
 
     /// The projects next to this one under the same parent, in order (itself included).
     private func siblings(of project: Project) -> [Project] {
-        let parents = ProjectTree.parents(projects.map(\.url.path))
+        let parents = projectParents
         guard let index = projects.firstIndex(where: { $0.id == project.id }) else { return [] }
         return projects.indices.filter { parents[$0] == parents[index] }.map { projects[$0] }
     }
@@ -346,10 +368,11 @@ final class AppStore {
         persistProjects()
     }
 
-    /// The changes in the repositories folded away under a collapsed project, to count with its own.
+    /// The changes in the repositories and work trees folded away under a collapsed project, to count with its own
+    /// (a work tree's as they were when it was folded: it is not watched meanwhile).
     func hiddenChanges(under project: Project) -> Int {
         guard collapsedProjects.contains(project.url.path), let index = projects.firstIndex(where: { $0.id == project.id }) else { return 0 }
-        return ProjectTree.descendants(of: index, in: projects.map(\.url.path)).reduce(0) { $0 + projects[$1].changes.count }
+        return ProjectTree.descendants(of: index, parents: projectParents).reduce(0) { $0 + projects[$1].changes.count }
     }
 
     func toggleCollapsed(_ project: Project) {
@@ -357,19 +380,97 @@ final class AppStore {
         if collapsedProjects.remove(path) == nil {
             collapsedProjects.insert(path)
             // The selection would vanish with the rows: it moves to the project folded.
-            if let current = currentProject, current.url.path.hasPrefix(path + "/") { select(project) }
+            if let index = projects.firstIndex(where: { $0.id == project.id }), let current = currentProject,
+               ProjectTree.descendants(of: index, parents: projectParents).contains(where: { projects[$0].id == current.id }) {
+                select(project)
+            }
         }
+        updateDormancy()
         persistProjects()
+    }
+
+    // MARK: Linked work trees
+
+    /// A work tree git lists is watched and asked for its status only while its row is in sight or it is selected:
+    /// an agent can leave dozens behind, and each would cost a watcher and a `git status` at every change.
+    private func updateDormancy() {
+        let visible = Set(projectRows.map { projects[$0.index].id })
+        for project in projects where project.isDerived {
+            let dormant = !visible.contains(project.id) && project.id != selectedProjectID
+            guard dormant != project.isDormant else { continue }
+            project.isDormant = dormant
+            if dormant {
+                project.stopWatching()
+            } else {
+                project.startWatching()
+                project.refresh()
+            }
+        }
+    }
+
+    /// Looks at the repository's work trees again when the folder git keeps them in has changed (or `force`), and
+    /// lists them under it: new ones appear, removed ones go. Nothing is created, removed or switched in git.
+    func syncWorktrees(of main: Project, force: Bool = false) {
+        guard !main.needsAccess, main.worktreeOf == nil, let gitDirectory = main.gitDirectory else { return }
+        // Work trees whose folder was deleted without telling git: the folder is the truth.
+        for worktree in projects where worktree.isDerived && worktree.worktreeOf == main.id
+            && !FileManager.default.fileExists(atPath: worktree.url.path) {
+            remove(worktree)
+        }
+        let folder = gitDirectory.appendingPathComponent("worktrees")
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: folder.path))?[.modificationDate] as? Date
+        if !force, let seen = main.worktreesStamp, seen == stamp { return }
+        // Never had any, and has none: nothing to ask git.
+        if stamp == nil, !projects.contains(where: { $0.worktreeOf == main.id }) {
+            main.worktreesStamp = .some(nil)
+            return
+        }
+        main.worktreesStamp = .some(stamp)
+        Task { @MainActor in
+            let list = await Git.worktrees(in: main.url)
+            func real(_ path: String) -> String { URL(fileURLWithPath: path).resolvingSymlinksInPath().path }
+            // Only the main work tree lists the others: opened alone, a linked one stays alone.
+            guard self.projects.contains(where: { $0.id == main.id }), let first = list.first,
+                  real(first.path) == real(main.url.path) else { return }
+            let wanted = list.dropFirst().filter { !$0.isBare && !$0.isPrunable && FileManager.default.fileExists(atPath: $0.path) }
+            let wantedPaths = Set(wanted.map { real($0.path) })
+            for worktree in self.projects where worktree.worktreeOf == main.id && !wantedPaths.contains(real(worktree.url.path)) {
+                worktree.worktreeOf = nil
+                if worktree.isDerived { self.remove(worktree) }
+            }
+            for entry in wanted {
+                if let existing = self.projects.first(where: { real($0.url.path) == real(entry.path) }) {
+                    // One the user added: shown under its repository, and still theirs.
+                    if existing.id != main.id { existing.worktreeOf = main.id }
+                    continue
+                }
+                guard FolderAccess.shared.covers(entry.path) else { continue }
+                let worktree = Project(url: URL(fileURLWithPath: entry.path))
+                worktree.worktreeOf = main.id
+                worktree.isDerived = true
+                // Asleep until its row is known to be in sight.
+                worktree.isDormant = true
+                self.install(worktree)
+                if let awaited = self.awaitedSelection, real(awaited) == real(entry.path) {
+                    self.awaitedSelection = nil
+                    self.select(worktree)
+                }
+            }
+            self.updateDormancy()
+        }
     }
 
     func select(_ project: Project) {
         // Chosen from elsewhere (Quick Open, a new repository found): it must be in sight.
-        let folded = collapsedProjects.filter { project.url.path.hasPrefix($0 + "/") }
-        if !folded.isEmpty { collapsedProjects.subtract(folded) }
+        if let index = projects.firstIndex(where: { $0.id == project.id }) {
+            let folded = ProjectTree.ancestors(of: index, parents: projectParents).map { projects[$0].url.path }
+            if !collapsedProjects.isDisjoint(with: folded) { collapsedProjects.subtract(folded) }
+        }
         if selectedProjectID != project.id {
             selectedProjectID = project.id
             persistProjects()
         }
+        updateDormancy()
         project.refresh()
         syncViewer()
     }
@@ -389,6 +490,7 @@ final class AppStore {
     }
 
     private func projectDidRefresh(_ project: Project) {
+        syncWorktrees(of: project)
         guard project.id == selectedProjectID else { return }
         if sidebarVisible { project.loadTree() }
         syncViewer()

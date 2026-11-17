@@ -143,9 +143,10 @@ private struct ProjectRow: View {
     @Environment(AppStore.self) private var store
     @State private var hovering = false
 
-    /// Under its parent a repository goes by its path from there ("services/core").
+    /// Under its parent a repository goes by its path from there ("services/core"); a work tree by its folder's
+    /// name, wherever that folder is.
     private var title: String {
-        guard let parent, project.url.path.hasPrefix(parent.url.path + "/") else { return project.name }
+        guard let parent, project.worktreeOf == nil, project.url.path.hasPrefix(parent.url.path + "/") else { return project.name }
         return String(project.url.path.dropFirst(parent.url.path.count + 1))
     }
 
@@ -174,7 +175,15 @@ private struct ProjectRow: View {
                 .padding(.leading, CGFloat(depth) * UI.s(14) - 3)
                 .padding(.trailing, -5)
             }
-            ProjectAvatar(name: project.name)
+            if project.worktreeOf != nil {
+                // A work tree of the repository above, not a repository of its own: a quiet mark, no monogram.
+                RoundedRectangle(cornerRadius: UI.s(24) * 0.28, style: .continuous)
+                    .fill(Color.difChip)
+                    .frame(width: UI.s(24), height: UI.s(24))
+                    .overlay(Image(systemName: "square.on.square").font(.ui(size: 11, weight: .medium)).foregroundStyle(Color.difText2))
+            } else {
+                ProjectAvatar(name: project.name)
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
                     .font(.ui(size: 13, weight: .medium))
@@ -217,7 +226,7 @@ private struct ProjectRow: View {
         .help(collapsed && changes > project.changes.count
               ? project.url.path + "\n" + L("\(changes - project.changes.count) changes in the repositories inside",
                                              "子仓库里有 \(changes - project.changes.count) 处改动")
-              : project.url.path)
+              : (project.worktreeOf != nil ? L("Work tree", "工作树") + " · " + project.url.path : project.url.path))
         .contextMenu {
             Button(L("Reveal in Finder", "在 Finder 中显示")) { NSWorkspace.shared.activateFileViewerSelecting([project.url]) }
             Button(L("Copy Path", "复制路径")) {
@@ -229,10 +238,15 @@ private struct ProjectRow: View {
             if hasChildren {
                 Button(collapsed ? L("Expand", "展开") : L("Collapse", "折叠")) { store.toggleCollapsed(project) }
             }
-            Button(L("Move Up", "上移")) { store.move(project, by: -1) }.disabled(!store.canMove(project, by: -1))
-            Button(L("Move Down", "下移")) { store.move(project, by: 1) }.disabled(!store.canMove(project, by: 1))
-            Divider()
-            Button(L("Remove from \(appName)", "从 \(appName) 中移除"), role: .destructive) { store.remove(project) }
+            // A work tree git lists follows git: nothing to order or to remove here.
+            if !project.isDerived {
+                Button(L("Move Up", "上移")) { store.move(project, by: -1) }.disabled(!store.canMove(project, by: -1))
+                Button(L("Move Down", "下移")) { store.move(project, by: 1) }.disabled(!store.canMove(project, by: 1))
+                Divider()
+            }
+            if !project.isDerived {
+                Button(L("Remove from \(appName)", "从 \(appName) 中移除"), role: .destructive) { store.remove(project) }
+            }
         }
     }
 }

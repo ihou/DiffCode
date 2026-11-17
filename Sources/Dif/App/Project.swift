@@ -65,6 +65,15 @@ final class Project: Identifiable {
     /// can be read until the user grants it again.
     var needsAccess = false
 
+    /// A linked work tree shown under its repository: the project of the main work tree.
+    var worktreeOf: UUID?
+    /// Listed because git has it as a work tree, not because the user added it: never saved, and gone with the work tree.
+    var isDerived = false
+    /// Folded away in the sidebar (only a derived work tree is): no watching and no status until it is in sight.
+    @ObservationIgnored var isDormant = false
+    /// When the folder git keeps its work trees in last changed, as of the last look at them (nil: never looked).
+    @ObservationIgnored var worktreesStamp: Date??
+
     var tab: ProjectTab = .changes
 
     // Local changes
@@ -241,7 +250,7 @@ final class Project: Identifiable {
     // MARK: Watching and refresh
 
     func startWatching() {
-        guard watcher == nil, !needsAccess else { return }
+        guard watcher == nil, !needsAccess, !isDormant else { return }
         watcher = FileWatcher(root: url) { [weak self] _, gitStateChanged in
             let project = self
             DispatchQueue.main.async {
@@ -277,7 +286,7 @@ final class Project: Identifiable {
     }
 
     func refresh() {
-        guard !needsAccess else { return }
+        guard !needsAccess, !isDormant else { return }
         if refreshTask != nil {
             refreshQueued = true
             return

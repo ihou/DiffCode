@@ -201,6 +201,8 @@ pub struct App {
     pub projects: Vec<Project>,
     pub selected: Option<ProjectId>,
     next_project_id: ProjectId,
+    /// The work tree that was selected when DiffCode last quit, until git lists it again.
+    awaited_selection: Option<PathBuf>,
     pub jobs: Jobs<App>,
     pub popup: Option<Popup>,
     pub sidebar_visible: bool,
@@ -279,6 +281,7 @@ impl App {
             projects: Vec::new(),
             selected: None,
             next_project_id: 1,
+            awaited_selection: None,
             jobs: Jobs::default(),
             popup: None,
             sidebar_visible: true,
@@ -371,6 +374,10 @@ impl App {
             }
         }
         let last = self.settings.selected_project.clone();
+        // A work tree was selected: it is listed once its repository has been asked for its work trees.
+        if last.as_ref().is_some_and(|l| !self.projects.iter().any(|p| same_path(&p.url, l))) {
+            self.awaited_selection = last.clone();
+        }
         self.selected = self.projects.iter().find(|p| Some(&p.url) == last.as_ref()).or(self.projects.first()).map(|p| p.id);
         for p in &mut self.projects {
             p.refresh();
@@ -405,7 +412,8 @@ impl App {
     }
 
     pub fn persist_projects(&mut self) {
-        self.settings.projects = self.projects.iter().map(|p| p.url.clone()).collect();
+        // Work trees listed by git are not the user's list: they come back from git.
+        self.settings.projects = self.projects.iter().filter(|p| !p.is_derived).map(|p| p.url.clone()).collect();
         self.settings.selected_project = self.current_project().map(|p| p.url.clone());
         // Only what is still listed, so the setting does not grow with every folder ever collapsed.
         let listed = self.project_keys();
@@ -548,7 +556,9 @@ impl App {
             |app: &mut App, (roots, rejected): (Vec<PathBuf>, usize)| {
                 let mut landed = None;
                 for root in roots {
-                    if let Some(existing) = app.projects.iter().find(|p| same_path(&p.url, &root)) {
+                    if let Some(existing) = app.projects.iter_mut().find(|p| same_path(&p.url, &root)) {
+                        // A work tree git listed, now added by hand: it stays whatever happens to the list.
+                        existing.is_derived = false;
                         landed = landed.or(Some(existing.id));
                         continue;
                     }
@@ -574,6 +584,7 @@ impl App {
         let Some(p) = self.project_mut(id) else { return };
         p.refresh();
         let url = p.url.clone();
+        self.sync_worktrees(id, true);
         self.jobs.spawn(
             {
                 let url = url.clone();
@@ -618,16 +629,136 @@ impl App {
     }
 
     pub fn remove_project(&mut self, id: ProjectId) {
+        // The work trees listed under it go with it; those the user added stay, on their own.
+        let linked: Vec<(ProjectId, bool)> = self.projects.iter().filter(|p| p.worktree_of == Some(id)).map(|p| (p.id, p.is_derived)).collect();
+        for (worktree, derived) in linked {
+            if let Some(p) = self.project_mut(worktree) {
+                p.worktree_of = None;
+            }
+            if derived {
+                self.remove_project(worktree);
+            }
+        }
+        let owner = self.project(id).and_then(|p| p.worktree_of);
         if let Some(p) = self.project_mut(id) {
             p.stop_watching();
         }
         self.remove_terminals_for(id);
         self.projects.retain(|p| p.id != id);
         if self.selected == Some(id) {
-            self.selected = self.projects.first().map(|p| p.id);
+            // A work tree that went: back to its repository.
+            self.selected = owner.filter(|o| self.project(*o).is_some()).or(self.projects.first().map(|p| p.id));
             self.sync_viewer();
         }
         self.persist_projects();
+    }
+
+    // Linked work trees.
+
+    /// A work tree git lists is watched and asked for its status only while its row is in sight or it is selected:
+    /// an agent can leave dozens behind, and each would cost a watcher and a `git status` at every change.
+    fn update_dormancy(&mut self) {
+        let visible: Vec<ProjectId> = self.project_rows().iter().map(|r| self.projects[r.index].id).collect();
+        let selected = self.selected;
+        for p in self.projects.iter_mut().filter(|p| p.is_derived) {
+            let dormant = !visible.contains(&p.id) && Some(p.id) != selected;
+            if dormant == p.is_dormant {
+                continue;
+            }
+            p.is_dormant = dormant;
+            if dormant {
+                p.stop_watching();
+            } else {
+                p.start_watching();
+                p.refresh();
+            }
+        }
+    }
+
+    /// Looks at the repository's work trees again when the folder git keeps them in has changed (or `force`), and
+    /// lists them under it: new ones appear, removed ones go. Nothing is created, removed or switched in git.
+    pub fn sync_worktrees(&mut self, id: ProjectId, force: bool) {
+        let Some(main) = self.project(id) else { return };
+        if main.worktree_of.is_some() {
+            return;
+        }
+        let Some(git_directory) = main.git_directory().map(Path::to_path_buf) else { return };
+        let url = main.url.clone();
+        let seen = main.worktrees_stamp;
+        // Work trees whose folder was deleted without telling git: the folder is the truth.
+        let gone: Vec<ProjectId> =
+            self.projects.iter().filter(|p| p.is_derived && p.worktree_of == Some(id) && !p.url.is_dir()).map(|p| p.id).collect();
+        for worktree in gone {
+            self.remove_project(worktree);
+        }
+        let stamp = std::fs::metadata(git_directory.join("worktrees")).and_then(|m| m.modified()).ok();
+        if !force && seen == Some(stamp) {
+            return;
+        }
+        if let Some(p) = self.project_mut(id) {
+            p.worktrees_stamp = Some(stamp);
+        }
+        // Never had any, and has none: nothing to ask git.
+        if stamp.is_none() && !self.projects.iter().any(|p| p.worktree_of == Some(id)) {
+            return;
+        }
+        self.jobs.spawn(
+            move || git::worktrees(&url),
+            move |app: &mut App, list: Vec<git::Worktree>| {
+                // Only the main work tree lists the others: opened alone, a linked one stays alone.
+                let Some(main) = app.project(id) else { return };
+                if !list.first().is_some_and(|first| same_path(&first.path, &main.url)) {
+                    return;
+                }
+                let wanted: Vec<PathBuf> =
+                    list.iter().skip(1).filter(|w| !w.is_bare && !w.is_prunable && w.path.is_dir()).map(|w| w.path.clone()).collect();
+                let stale: Vec<(ProjectId, bool)> = app
+                    .projects
+                    .iter()
+                    .filter(|p| p.worktree_of == Some(id) && !wanted.iter().any(|w| same_path(w, &p.url)))
+                    .map(|p| (p.id, p.is_derived))
+                    .collect();
+                for (worktree, derived) in stale {
+                    if let Some(p) = app.project_mut(worktree) {
+                        p.worktree_of = None;
+                    }
+                    if derived {
+                        app.remove_project(worktree);
+                    }
+                }
+                for path in wanted {
+                    if let Some(existing) = app.projects.iter_mut().find(|p| same_path(&p.url, &path)) {
+                        // One the user added: shown under its repository, and still theirs.
+                        if existing.id != id {
+                            existing.worktree_of = Some(id);
+                        }
+                        continue;
+                    }
+                    let awaited = app.awaited_selection.as_ref().is_some_and(|a| same_path(a, &path));
+                    let worktree = app.install_dormant(path, id);
+                    if awaited {
+                        app.awaited_selection = None;
+                        app.select(worktree);
+                    }
+                }
+                app.update_dormancy();
+            },
+        );
+    }
+
+    /// A work tree git lists, asleep until its row is known to be in sight.
+    fn install_dormant(&mut self, url: PathBuf, owner: ProjectId) -> ProjectId {
+        let id = self.next_project_id;
+        self.next_project_id += 1;
+        let mut project = Project::new(id, url);
+        if let Some(waker) = self.jobs.waker() {
+            project.jobs.set_waker(waker);
+        }
+        project.worktree_of = Some(owner);
+        project.is_derived = true;
+        project.is_dormant = true;
+        self.projects.push(project);
+        id
     }
 
     // The projects as a tree.
@@ -636,13 +767,22 @@ impl App {
         self.projects.iter().map(|p| project_tree::key(&p.url)).collect()
     }
 
+    /// For each project, the one it sits under: the repository of a work tree, or the listed folder it is inside.
+    fn project_parents(&self) -> Vec<Option<usize>> {
+        project_tree::parents(&self.project_keys(), &self.project_owners())
+    }
+
+    fn project_owners(&self) -> Vec<Option<usize>> {
+        self.projects.iter().map(|p| p.worktree_of.and_then(|o| self.projects.iter().position(|q| q.id == o))).collect()
+    }
+
     fn collapsed_keys(&self) -> Vec<String> {
         self.settings.collapsed.iter().map(|p| project_tree::key(p)).collect()
     }
 
     /// The sidebar's rows: a repository inside another one listed sits under it.
     pub fn project_rows(&self) -> Vec<project_tree::Row> {
-        project_tree::rows(&self.project_keys(), &self.collapsed_keys())
+        project_tree::rows(&self.project_keys(), &self.project_owners(), &self.collapsed_keys())
     }
 
     pub fn is_collapsed(&self, id: ProjectId) -> bool {
@@ -651,7 +791,7 @@ impl App {
 
     /// The projects next to this one under the same parent, in order (itself included).
     fn siblings(&self, id: ProjectId) -> Vec<ProjectId> {
-        let parents = project_tree::parents(&self.project_keys());
+        let parents = self.project_parents();
         let Some(index) = self.projects.iter().position(|p| p.id == id) else { return Vec::new() };
         (0..self.projects.len()).filter(|i| parents[*i] == parents[index]).map(|i| self.projects[i].id).collect()
     }
@@ -685,7 +825,7 @@ impl App {
             return 0;
         }
         let Some(index) = self.projects.iter().position(|p| p.id == id) else { return 0 };
-        project_tree::descendants(index, &self.project_keys()).into_iter().map(|i| self.projects[i].changes().len()).sum()
+        project_tree::descendants(index, &self.project_parents()).into_iter().map(|i| self.projects[i].changes().len()).sum()
     }
 
     pub fn toggle_collapsed(&mut self, id: ProjectId) {
@@ -696,23 +836,28 @@ impl App {
         } else {
             self.settings.collapsed.push(url);
             // The selection would vanish with the rows: it moves to the project folded.
-            let below = key + "/";
-            if self.current_project().is_some_and(|p| project_tree::key(&p.url).starts_with(&below)) {
+            let index = self.projects.iter().position(|p| p.id == id).unwrap_or(0);
+            let under = project_tree::descendants(index, &self.project_parents());
+            if under.iter().any(|i| Some(self.projects[*i].id) == self.selected) {
                 self.select(id);
             }
         }
+        self.update_dormancy();
         self.persist_projects();
     }
 
     pub fn select(&mut self, id: ProjectId) {
         // Chosen from elsewhere (Quick Open, a new repository found): it must be in sight.
-        if let Some(key) = self.project(id).map(|p| project_tree::key(&p.url)) {
-            self.settings.collapsed.retain(|c| !key.starts_with(&(project_tree::key(c) + "/")));
+        if let Some(index) = self.projects.iter().position(|p| p.id == id) {
+            let keys = self.project_keys();
+            let above: Vec<String> = project_tree::ancestors(index, &self.project_parents()).into_iter().map(|i| keys[i].clone()).collect();
+            self.settings.collapsed.retain(|c| !above.contains(&project_tree::key(c)));
         }
         if self.selected != Some(id) {
             self.selected = Some(id);
             self.persist_projects();
         }
+        self.update_dormancy();
         if let Some(p) = self.project_mut(id) {
             p.refresh();
         }
@@ -740,6 +885,7 @@ impl App {
     }
 
     fn project_did_refresh(&mut self, id: ProjectId) {
+        self.sync_worktrees(id, false);
         if Some(id) != self.selected {
             return;
         }

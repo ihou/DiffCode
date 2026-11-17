@@ -414,6 +414,40 @@ pub fn normalize_git_path(p: &str) -> String {
     if cfg!(windows) { p.replace('/', "\\") } else { p.to_string() }
 }
 
+/// One of a repository's work trees, as `git worktree list` has it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Worktree {
+    pub path: PathBuf,
+    /// "refs/heads/x"; None when detached or bare.
+    pub branch: Option<String>,
+    pub is_bare: bool,
+    /// Git's record of a work tree whose folder is gone.
+    pub is_prunable: bool,
+}
+
+/// The repository's work trees, the main one first. Empty when git could not say.
+pub fn worktrees(dir: &Path) -> Vec<Worktree> {
+    run_string(dir, ["worktree", "list", "--porcelain"]).map(|text| parse_worktrees(&text)).unwrap_or_default()
+}
+
+pub fn parse_worktrees(text: &str) -> Vec<Worktree> {
+    let mut list: Vec<Worktree> = Vec::new();
+    for line in text.lines() {
+        if let Some(path) = line.strip_prefix("worktree ") {
+            list.push(Worktree { path: PathBuf::from(normalize_git_path(path)), ..Default::default() });
+        } else if let Some(last) = list.last_mut() {
+            if let Some(branch) = line.strip_prefix("branch ") {
+                last.branch = Some(branch.to_string());
+            } else if line == "bare" {
+                last.is_bare = true;
+            } else if line.starts_with("prunable") {
+                last.is_prunable = true;
+            }
+        }
+    }
+    list
+}
+
 /// The most repositories one chosen folder adds.
 pub const DISCOVERY_LIMIT: usize = 60;
 
@@ -1091,6 +1125,17 @@ pub fn parse_grep_record(record: &[u8]) -> Option<GrepHit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn work_trees_are_read_from_git() {
+        let text = "worktree /w/ws\nHEAD 4d15\nbranch refs/heads/main\n\nworktree /w/ws-fix\nHEAD 4d15\nbranch refs/heads/fix\n\n\
+worktree /w/gone\nHEAD 4d15\ndetached\nprunable gitdir file points to non-existent location\n\nworktree /w/bare\nbare\n";
+        let list = parse_worktrees(text);
+        assert_eq!(list.len(), 4);
+        assert_eq!(list[1].branch.as_deref(), Some("refs/heads/fix"));
+        assert!(list[2].is_prunable && list[2].branch.is_none());
+        assert!(list[3].is_bare);
+    }
 
     /// Issue #5: a workspace that is a repository itself, with others in it.
     #[test]

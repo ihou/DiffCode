@@ -20,7 +20,29 @@ final class ProjectTreeTests: XCTestCase {
         let rows = ProjectTree.rows(paths: paths, collapsed: ["/w/ws"])
         XCTAssertTrue(rows[0].hasChildren)
         XCTAssertFalse(rows[1].hasChildren)
-        XCTAssertEqual(ProjectTree.descendants(of: 0, in: paths), [2, 3, 4])
+        XCTAssertEqual(ProjectTree.descendants(of: 0, parents: ProjectTree.parents(paths)), [2, 3, 4])
+        XCTAssertEqual(ProjectTree.ancestors(of: 4, parents: ProjectTree.parents(paths)), [2, 0])
+    }
+
+    /// A linked work tree sits under its repository wherever its folder is: beside it, or inside another project.
+    func testAWorkTreeSitsUnderItsRepository() {
+        let paths = ["/w/ws", "/w/ws/api", "/elsewhere/fix-login", "/w/ws/api/.claude/worktrees/task"]
+        let owners: [Int?] = [nil, nil, 1, 0]
+        XCTAssertEqual(ProjectTree.parents(paths, owners: owners), [nil, 0, 1, 0])
+        XCTAssertEqual(ProjectTree.rows(paths: paths, owners: owners).map(\.index), [0, 1, 2, 3])
+        XCTAssertEqual(ProjectTree.rows(paths: paths, owners: owners, collapsed: ["/w/ws/api"]).map(\.index), [0, 1, 3])
+        XCTAssertEqual(ProjectTree.descendants(of: 0, parents: ProjectTree.parents(paths, owners: owners)), [1, 2, 3])
+    }
+
+    func testWorkTreesAreReadFromGit() {
+        let text = "worktree /w/ws\nHEAD 4d15\nbranch refs/heads/main\n\nworktree /w/ws-fix\nHEAD 4d15\nbranch refs/heads/fix\n\n"
+            + "worktree /w/gone\nHEAD 4d15\ndetached\nprunable gitdir file points to non-existent location\n\nworktree /w/bare\nbare\n"
+        XCTAssertEqual(Git.parseWorktrees(text), [
+            Git.Worktree(path: "/w/ws", branch: "refs/heads/main"),
+            Git.Worktree(path: "/w/ws-fix", branch: "refs/heads/fix"),
+            Git.Worktree(path: "/w/gone", isPrunable: true),
+            Git.Worktree(path: "/w/bare", isBare: true),
+        ])
     }
 
     func testWithoutItsParentARepositoryMovesUpALevel() {

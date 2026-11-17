@@ -233,6 +233,36 @@ enum Git {
         return path.isEmpty ? nil : URL(fileURLWithPath: path)
     }
 
+    /// One of a repository's work trees, as `git worktree list` has it.
+    struct Worktree: Equatable {
+        var path: String
+        /// "refs/heads/x"; nil when detached or bare.
+        var branch: String?
+        var isBare = false
+        /// Git's record of a work tree whose folder is gone.
+        var isPrunable = false
+    }
+
+    /// The repository's work trees, the main one first. Empty when git could not say.
+    static func worktrees(in dir: URL) async -> [Worktree] {
+        guard let text = try? await runString(["worktree", "list", "--porcelain"], in: dir) else { return [] }
+        return parseWorktrees(text)
+    }
+
+    static func parseWorktrees(_ text: String) -> [Worktree] {
+        var list: [Worktree] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            if line.hasPrefix("worktree ") {
+                list.append(Worktree(path: String(line.dropFirst("worktree ".count))))
+            } else if !list.isEmpty {
+                if line.hasPrefix("branch ") { list[list.count - 1].branch = String(line.dropFirst("branch ".count)) }
+                if line == "bare" { list[list.count - 1].isBare = true }
+                if line.hasPrefix("prunable") { list[list.count - 1].isPrunable = true }
+            }
+        }
+        return list
+    }
+
     /// The most repositories one chosen folder adds.
     static let discoveryLimit = 60
 

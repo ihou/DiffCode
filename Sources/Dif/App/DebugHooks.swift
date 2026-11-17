@@ -195,6 +195,7 @@ enum DebugHooks {
             // What the sandbox lets each project do: whether its folder is open, what git said.
             let lines = store.projects.map { p in
                 "\(p.url.path) access=\(!p.needsAccess) loaded=\(p.hasLoaded) changes=\(p.changes.count) branch=\(p.branchLabel) " +
+                    "worktree=\(p.worktreeOf != nil) derived=\(p.isDerived) dormant=\(p.isDormant) " +
                     "deferred=\(p.needsRefreshWhenVisible) visible=\(store.isWindowVisible) error=\(p.errorMessage ?? "-")"
             }
             FileHandle.standardError.write(Data("""

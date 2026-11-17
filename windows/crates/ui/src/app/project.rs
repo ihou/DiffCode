@@ -100,6 +100,14 @@ pub struct Project {
     pub id: ProjectId,
     pub url: PathBuf,
     pub name: String,
+    /// A linked work tree shown under its repository: the project of the main work tree.
+    pub worktree_of: Option<ProjectId>,
+    /// Listed because git has it as a work tree, not because the user added it: never saved, and gone with the work tree.
+    pub is_derived: bool,
+    /// Folded away in the sidebar (only a derived work tree is): no watching and no status until it is in sight.
+    pub is_dormant: bool,
+    /// When the folder git keeps its work trees in last changed, as of the last look at them (None: never looked).
+    pub worktrees_stamp: Option<Option<std::time::SystemTime>>,
     pub jobs: Jobs<Project>,
     pub events: Vec<ProjectEvent>,
 
@@ -247,6 +255,10 @@ impl Project {
             activity: None,
             activity_cancel: None,
             git_directory: None,
+            worktree_of: None,
+            is_derived: false,
+            is_dormant: false,
+            worktrees_stamp: None,
             conflict_base: ConflictBase::Head,
             prefilled_message: None,
             browsed_path: None,
@@ -393,7 +405,7 @@ impl Project {
     // MARK: Watching and refresh
 
     pub fn start_watching(&mut self) {
-        if self.watcher.is_some() {
+        if self.watcher.is_some() || self.is_dormant {
             return;
         }
         let poster = self.jobs.poster();
@@ -424,6 +436,9 @@ impl Project {
     }
 
     pub fn refresh(&mut self) {
+        if self.is_dormant {
+            return;
+        }
         if self.refresh_running {
             self.refresh_queued = true;
             return;
