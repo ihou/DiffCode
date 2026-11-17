@@ -180,7 +180,7 @@ private struct ProjectRow: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(project.url.path, forType: .string)
             }
-            Button(L("Refresh", "刷新")) { project.refresh() }
+            Button(L("Refresh", "刷新")) { store.refreshAndDiscover(project) }
             Divider()
             if let index = store.projects.firstIndex(where: { $0.id == project.id }) {
                 Button(L("Move Up", "上移")) { store.moveProjects(from: IndexSet(integer: index), to: index - 1) }

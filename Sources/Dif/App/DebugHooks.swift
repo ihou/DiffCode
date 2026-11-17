@@ -203,6 +203,9 @@ enum DebugHooks {
                 \(lines.joined(separator: "\n"))
 
                 """.utf8))
+        case "rediscover":
+            // The sidebar menu's Refresh on the current project.
+            if let project = store.currentProject { store.refreshAndDiscover(project) }
         case "addproject": store.addProjects([URL(fileURLWithPath: argument)])
         case "dropgrants": UserDefaults.standard.removeObject(forKey: "folderBookmarks") // the next launch starts without them
         case "gitident":

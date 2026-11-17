@@ -235,11 +235,7 @@ fn project_menu(app: &mut App, id: ProjectId, at: Point) {
     let items = vec![
         MenuItem::new(l("Reveal in File Explorer", "在资源管理器中显示"), move |app| app.requests.push(PlatformRequest::Reveal(url))),
         MenuItem::new(l("Copy Path", "复制路径"), move |app| app.copy_text(path)),
-        MenuItem::new(l("Refresh", "刷新"), move |app| {
-            if let Some(p) = app.project_mut(id) {
-                p.refresh();
-            }
-        }),
+        MenuItem::new(l("Refresh", "刷新"), move |app| app.refresh_and_discover(id)),
         MenuItem::separator(),
         MenuItem::new(l("Move Up", "上移"), move |app| app.move_project(id, -1)).disabled(index == 0),
         MenuItem::new(l("Move Down", "下移"), move |app| app.move_project(id, 1)).disabled(index == last),

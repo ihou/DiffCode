@@ -564,6 +564,55 @@ impl App {
         );
     }
 
+    /// The sidebar's Refresh: the project's changes, and the repositories that appeared inside it since it was
+    /// added, put right below it. Only this one looks for repositories; the other refreshes stay as light as they were.
+    pub fn refresh_and_discover(&mut self, id: ProjectId) {
+        let Some(p) = self.project_mut(id) else { return };
+        p.refresh();
+        let url = p.url.clone();
+        self.jobs.spawn(
+            {
+                let url = url.clone();
+                move || git::repositories_for(&url, 3)
+            },
+            move |app: &mut App, found: Vec<PathBuf>| {
+                if app.project(id).is_none() {
+                    return;
+                }
+                let below = |p: &Path| {
+                    let norm = |p: &Path| p.to_string_lossy().replace('\\', "/").trim_end_matches('/').to_lowercase();
+                    norm(p).starts_with(&(norm(&url) + "/"))
+                };
+                let mut added = 0;
+                for root in found {
+                    if app.projects.iter().any(|p| same_path(&p.url, &root)) {
+                        continue;
+                    }
+                    let inner = app.install(root);
+                    // Below the project and the repositories of its already listed.
+                    let count = app.projects.len();
+                    if let Some(last) = app.projects[..count - 1].iter().rposition(|p| p.id == id || below(&p.url)) {
+                        let project = app.projects.remove(count - 1);
+                        app.projects.insert(last + 1, project);
+                    }
+                    if let Some(p) = app.project_mut(inner) {
+                        p.refresh();
+                    }
+                    added += 1;
+                }
+                if added == 0 {
+                    return;
+                }
+                app.persist_projects();
+                app.show_toast(if added == 1 {
+                    l("Added 1 repository found inside", "已添加新发现的 1 个子仓库")
+                } else {
+                    lf!("Added {added} repositories found inside", "已添加新发现的 {added} 个子仓库")
+                });
+            },
+        );
+    }
+
     pub fn remove_project(&mut self, id: ProjectId) {
         if let Some(p) = self.project_mut(id) {
             p.stop_watching();

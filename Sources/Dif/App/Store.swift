@@ -269,6 +269,34 @@ final class AppStore {
         }
     }
 
+    /// The sidebar's Refresh: the project's changes, and the repositories that appeared inside it since it was
+    /// added, put right below it. Only this one looks for repositories; the other refreshes stay as light as they were.
+    func refreshAndDiscover(_ project: Project) {
+        project.refresh()
+        Task { @MainActor in
+            let found = await Git.repositories(for: project.url)
+            guard self.projects.contains(where: { $0.id == project.id }) else { return }
+            var added = 0
+            for root in found {
+                let path = root.standardizedFileURL.path
+                guard !self.projects.contains(where: { $0.url.path == path }) else { continue }
+                let inner = Project(url: root)
+                self.install(inner)
+                // Below the project and the repositories of its already listed.
+                let below = project.url.path + "/"
+                if let last = self.projects.dropLast().lastIndex(where: { $0.id == project.id || $0.url.path.hasPrefix(below) }) {
+                    self.projects.move(fromOffsets: IndexSet(integer: self.projects.count - 1), toOffset: last + 1)
+                }
+                inner.refresh()
+                added += 1
+            }
+            guard added > 0 else { return }
+            self.persistProjects()
+            self.showToast(added == 1 ? L("Added 1 repository found inside", "已添加新发现的 1 个子仓库")
+                                      : L("Added \(added) repositories found inside", "已添加新发现的 \(added) 个子仓库"))
+        }
+    }
+
     func remove(_ project: Project) {
         terminals.removeAll(for: project)
         project.stopWatching()
