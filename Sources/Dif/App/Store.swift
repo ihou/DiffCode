@@ -230,12 +230,8 @@ final class AppStore {
                 var isDirectory: ObjCBool = false
                 guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
                 let directory = isDirectory.boolValue ? url : url.deletingLastPathComponent()
-                var roots: [URL] = []
-                if let root = await Git.repositoryRoot(for: directory) {
-                    roots = [root]
-                } else {
-                    roots = Git.nestedRepositories(in: directory)
-                }
+                // The repository chosen, or those in a plain folder, and the repositories inside them.
+                let roots = await Git.repositories(for: directory)
                 if roots.isEmpty {
                     rejected += 1
                     // A folder with no repository in it needs no access kept. (A file keeps its own: ~/.gitconfig.)

@@ -233,6 +233,67 @@ enum Git {
         return path.isEmpty ? nil : URL(fileURLWithPath: path)
     }
 
+    /// The most repositories one chosen folder adds.
+    static let discoveryLimit = 60
+
+    /// The repositories a folder the user chose stands for: the one it is in, or those directly inside a plain
+    /// folder, each followed by the independent repositories inside it (a workspace that is a repository itself,
+    /// with others in it).
+    static func repositories(for directory: URL) async -> [URL] {
+        var found: [URL] = []
+        var seen = Set<String>()
+        func add(_ repository: URL) async {
+            guard found.count < discoveryLimit, seen.insert(repository.standardizedFileURL.path).inserted else { return }
+            found.append(repository)
+            for inner in await repositories(inside: repository) { await add(inner) }
+        }
+        if let root = await repositoryRoot(for: directory) {
+            await add(root)
+        } else {
+            for repository in nestedRepositories(in: directory) { await add(repository) }
+        }
+        return found
+    }
+
+    /// The independent repositories in a repository's work tree, by what git says of its folders: one git does
+    /// not track is a candidate, and an ignored one counts only when it is a repository itself, so nothing is
+    /// looked for inside `node_modules` and the like. Not submodules (tracked), not hidden folders, and not linked
+    /// work trees, which belong to a repository rather than stand beside it.
+    static func repositories(inside repository: URL) async -> [URL] {
+        let list = ["ls-files", "-z", "--others", "--exclude-standard", "--directory", "--no-empty-directory"]
+        async let untrackedOutput = try? run(list, in: repository)
+        async let ignoredOutput = try? run(list + ["--ignored"], in: repository)
+        func folders(_ data: Data?) -> [URL] {
+            (data ?? Data()).split(separator: 0).compactMap { entry in
+                guard entry.last == UInt8(ascii: "/") else { return nil }
+                let path = String(decoding: entry.dropLast(), as: UTF8.self)
+                guard !path.split(separator: "/").contains(where: { $0.hasPrefix(".") }) else { return nil }
+                return repository.appendingPathComponent(path, isDirectory: true)
+            }
+        }
+        var found: [URL] = []
+        for folder in folders(await untrackedOutput) {
+            if FileManager.default.fileExists(atPath: folder.appendingPathComponent(".git").path) {
+                if isIndependentRepository(folder) { found.append(folder) }
+            } else {
+                found += nestedRepositories(in: folder).filter(isIndependentRepository)
+            }
+        }
+        found += folders(await ignoredOutput).filter(isIndependentRepository)
+        return found.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
+    }
+
+    /// Whether a folder is a repository of its own: `.git` is a folder, or a file that names one elsewhere
+    /// (`--separate-git-dir`). A linked work tree's `.git` file points into its repository's `worktrees`.
+    static func isIndependentRepository(_ folder: URL) -> Bool {
+        let dotGit = folder.appendingPathComponent(".git")
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: dotGit.path, isDirectory: &isDirectory) else { return false }
+        if isDirectory.boolValue { return true }
+        guard let text = try? String(contentsOf: dotGit, encoding: .utf8) else { return false }
+        return !text.replacingOccurrences(of: "\\", with: "/").contains("/worktrees/")
+    }
+
     /// Repositories directly inside a plain folder (handy for multi-repo workspaces).
     static func nestedRepositories(in url: URL, maxDepth: Int = 2) -> [URL] {
         let fm = FileManager.default
@@ -248,7 +309,7 @@ enum Git {
                 } else {
                     scan(entry, depth: depth + 1)
                 }
-                if found.count >= 60 { return }
+                if found.count >= discoveryLimit { return }
             }
         }
         scan(url, depth: 1)

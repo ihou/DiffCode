@@ -532,10 +532,8 @@ impl App {
                     } else {
                         continue;
                     };
-                    let found = match git::repository_root(&directory) {
-                        Some(root) => vec![root],
-                        None => git::nested_repositories(&directory, 3),
-                    };
+                    // The repository chosen, or those in a plain folder, and the repositories inside them.
+                    let found = git::repositories_for(&directory, 3);
                     if found.is_empty() {
                         rejected += 1;
                     }

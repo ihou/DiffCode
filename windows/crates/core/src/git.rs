@@ -414,6 +414,78 @@ pub fn normalize_git_path(p: &str) -> String {
     if cfg!(windows) { p.replace('/', "\\") } else { p.to_string() }
 }
 
+/// The most repositories one chosen folder adds.
+pub const DISCOVERY_LIMIT: usize = 60;
+
+/// The repositories a folder the user chose stands for: the one it is in, or those inside a plain folder
+/// (`max_depth` levels down), each followed by the independent repositories inside it (a workspace that is a
+/// repository itself, with others in it).
+pub fn repositories_for(directory: &Path, max_depth: usize) -> Vec<PathBuf> {
+    fn add(repository: PathBuf, found: &mut Vec<PathBuf>) {
+        if found.len() >= DISCOVERY_LIMIT || found.contains(&repository) {
+            return;
+        }
+        found.push(repository.clone());
+        for inner in repositories_inside(&repository) {
+            add(inner, found);
+        }
+    }
+    let mut found = Vec::new();
+    match repository_root(directory) {
+        Some(root) => add(root, &mut found),
+        None => {
+            for repository in nested_repositories(directory, max_depth) {
+                add(repository, &mut found);
+            }
+        }
+    }
+    found
+}
+
+/// The independent repositories in a repository's work tree, by what git says of its folders: one git does not
+/// track is a candidate, and an ignored one counts only when it is a repository itself, so nothing is looked for
+/// inside `node_modules` and the like. Not submodules (tracked), not hidden folders, and not linked work trees,
+/// which belong to a repository rather than stand beside it.
+pub fn repositories_inside(repository: &Path) -> Vec<PathBuf> {
+    let folders = |ignored: bool| -> Vec<PathBuf> {
+        let mut args = vec!["ls-files", "-z", "--others", "--exclude-standard", "--directory", "--no-empty-directory"];
+        if ignored {
+            args.push("--ignored");
+        }
+        let output = cmd(repository, args).run().unwrap_or_default();
+        output
+            .split(|b| *b == 0)
+            .filter_map(|entry| entry.strip_suffix(b"/"))
+            .map(|entry| String::from_utf8_lossy(entry).into_owned())
+            .filter(|path| !path.split('/').any(|part| part.starts_with('.')))
+            .map(|path| path.split('/').fold(repository.to_path_buf(), |folder, part| folder.join(part)))
+            .collect()
+    };
+    let mut found = Vec::new();
+    for folder in folders(false) {
+        if folder.join(".git").exists() {
+            if is_independent_repository(&folder) {
+                found.push(folder);
+            }
+        } else {
+            found.extend(nested_repositories(&folder, 2).into_iter().filter(|f| is_independent_repository(f)));
+        }
+    }
+    found.extend(folders(true).into_iter().filter(|f| is_independent_repository(f)));
+    found.sort_by(|a, b| natural_cmp(&a.to_string_lossy(), &b.to_string_lossy()));
+    found
+}
+
+/// Whether a folder is a repository of its own: `.git` is a folder, or a file that names one elsewhere
+/// (`--separate-git-dir`). A linked work tree's `.git` file points into its repository's `worktrees`.
+pub fn is_independent_repository(folder: &Path) -> bool {
+    let dot_git = folder.join(".git");
+    if dot_git.is_dir() {
+        return true;
+    }
+    std::fs::read_to_string(&dot_git).map(|text| !text.replace('\\', "/").contains("/worktrees/")).unwrap_or(false)
+}
+
 /// Repositories directly inside a plain folder (handy for multi-repo workspaces).
 pub fn nested_repositories(path: &Path, max_depth: usize) -> Vec<PathBuf> {
     let mut found = Vec::new();
@@ -440,7 +512,7 @@ pub fn nested_repositories(path: &Path, max_depth: usize) -> Vec<PathBuf> {
             } else {
                 scan(&entry, depth + 1, max_depth, found);
             }
-            if found.len() >= 60 {
+            if found.len() >= DISCOVERY_LIMIT {
                 return;
             }
         }
@@ -1019,6 +1091,63 @@ pub fn parse_grep_record(record: &[u8]) -> Option<GrepHit> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Issue #5: a workspace that is a repository itself, with others in it.
+    #[test]
+    fn a_repository_brings_the_repositories_inside_it() {
+        if !is_available() {
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().canonicalize().unwrap();
+        let workspace = base.join("workspace");
+        let git = |at: &Path, args: &[&str]| {
+            std::fs::create_dir_all(at).unwrap();
+            let identity = ["-c", "user.name=t", "-c", "user.email=t@example.invalid", "-c", "commit.gpgsign=false"];
+            cmd(at, identity.iter().chain(args).copied()).run().unwrap();
+        };
+        std::fs::create_dir_all(workspace.join("docs")).unwrap();
+        git(&workspace, &["init", "-q", "-b", "main"]);
+        std::fs::write(workspace.join(".gitignore"), "api/\nweb/\nnode_modules/\nvendor/\n").unwrap();
+        std::fs::write(workspace.join("docs").join("readme.md"), "# Docs\n").unwrap();
+        git(&workspace, &["add", "-A"]);
+        git(&workspace, &["commit", "-q", "-m", "Workspace"]);
+        let repository = |path: &str| git(&path.split('/').fold(workspace.clone(), |p, part| p.join(part)), &["init", "-q", "-b", "main"]);
+        // Ignored repositories, one not ignored below a tracked folder, one below an untracked folder.
+        for path in ["api", "web", "docs/handbook", "tools/deep/thing"] {
+            repository(path);
+        }
+        // A repository inside a repository found, and one in a folder that one ignores.
+        std::fs::write(workspace.join("api").join(".gitignore"), "build/\n").unwrap();
+        for path in ["api/services/core", "api/build"] {
+            repository(path);
+        }
+        // Not looked for: below an ignored folder that is no repository, in a hidden folder, a linked work tree.
+        for path in ["vendor/dependency", "node_modules/package", ".cache/clone"] {
+            repository(path);
+        }
+        git(&workspace, &["worktree", "add", "-q", "linked", "-b", "linked"]);
+
+        let names = |found: Vec<PathBuf>| -> Vec<String> {
+            found
+                .iter()
+                .map(|p| p.canonicalize().unwrap().strip_prefix(&base).unwrap().to_string_lossy().replace('\\', "/"))
+                .collect()
+        };
+        let expected = [
+            "workspace",
+            "workspace/api",
+            "workspace/api/build",
+            "workspace/api/services/core",
+            "workspace/docs/handbook",
+            "workspace/tools/deep/thing",
+            "workspace/web",
+        ];
+        assert_eq!(names(repositories_for(&workspace, 3)), expected);
+        assert_eq!(names(repositories_for(&workspace.join("docs"), 3)), expected);
+        assert_eq!(names(repositories_for(&base, 3)), expected);
+        assert_eq!(names(repositories_for(&workspace.join("web"), 3)), ["workspace/web"]);
+    }
 
     #[test]
     fn parses_porcelain_v2() {
