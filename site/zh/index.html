@@ -58,7 +58,7 @@
   "mainEntity": [
     { "@type": "Question", "name": "DiffCode 免费吗？", "acceptedAnswer": { "@type": "Answer", "text": "免费。DiffCode 是开源软件，采用 GNU 通用公共许可证 v3.0，没有账号、订阅或付费版本，源码在 GitHub 上。" } },
     { "@type": "Question", "name": "DiffCode 是做什么用的？", "acceptedAnswer": { "@type": "Answer", "text": "它是 Mac 和 Windows 上的 Git diff 和代码对比工具，用来查看和提交 Git 仓库里的改动：并排或单栏显示 diff，可以直接改、按行提交，也能处理分支、历史、Stash 和合并冲突。它不是代码编辑器，也不是 IDE。" } },
-    { "@type": "Question", "name": "和直接打开 IDE 有什么区别？", "acceptedAnswer": { "@type": "Answer", "text": "IDE 会同时启动代码补全、编译、索引和插件，常常要占几个 GB 内存。DiffCode 只保留 diff、提交、历史和终端，所以打开快，平时只占 30–50 MB 内存。" } },
+    { "@type": "Question", "name": "和直接打开 IDE 有什么区别？", "acceptedAnswer": { "@type": "Answer", "text": "在 IDE 里打开项目，要等它加载插件、建好索引，还常常占掉几个 GB 内存。DiffCode 只保留 diff、提交、历史和终端，所以打开快，平时只占 30–50 MB 内存。" } },
     { "@type": "Question", "name": "DiffCode 有多大？", "acceptedAnswer": {"@type": "Answer", "text": "两个系统的安装包都在 4 MB 左右，Mac 版装好后大约 8 MB。它是原生应用（Mac 上用 AppKit，Windows 上用 Win32），没有打包浏览器内核或额外的运行时，所以启动快，平时只占 30–50 MB 内存。"}},
     { "@type": "Question", "name": "能看 Claude Code 或 Codex 改了什么吗？", "acceptedAnswer": { "@type": "Answer", "text": "能。在 DiffCode 的内置终端里（或者任何地方）运行 agent，它改的每个文件都会实时出现在 diff 里。「与分支比较」可以一次看完 agent 自分叉以来的全部改动。" } },
     { "@type": "Question", "name": "能只提交文件的一部分吗？", "acceptedAnswer": { "@type": "Answer", "text": "能。取消勾选某一处改动，或者选中几行不提交，这些改动会留在工作区，下次再提交。" } },
@@ -153,7 +153,7 @@
     <div class="head reveal">
       <span class="eyebrow">为什么做 DiffCode</span>
       <h2>IDE 也能看 Git diff。<span class="muted nw">只是太重了。</span></h2>
-      <p>为了看一眼改了什么，代码补全、编译、索引和一堆插件也跟着启动：打开要等，还要占掉几个 GB 内存。AI 和同事写的代码越来越多，看改动这件事一天要做很多遍。DiffCode 是更轻量的选择：只留下你真正要用的部分——Git diff、提交和历史。</p>
+      <p>为了看一眼改了什么，也得等 IDE 加载插件、建好索引，还要占掉几个 GB 内存。AI 和同事写的代码越来越多，看改动这件事一天要做很多遍。DiffCode 是更轻量的选择：只留下你真正要用的部分——Git diff、提交和历史。</p>
     </div>
     <div class="split reveal">
       <div class="split-col">
@@ -312,7 +312,7 @@
     <div class="faq">
       <div class="qa"><h3>DiffCode 免费吗？</h3><p>免费。DiffCode 是开源软件，采用 GNU 通用公共许可证 v3.0，没有账号、订阅或付费版本，源码在 GitHub 上。</p></div>
       <div class="qa"><h3>DiffCode 是做什么用的？</h3><p>它是 Mac 和 Windows 上的 Git diff 和代码对比工具，用来查看和提交 Git 仓库里的改动：并排或单栏显示 diff，可以直接改、按行提交，也能处理分支、历史、Stash 和合并冲突。它不是代码编辑器，也不是 IDE。</p></div>
-      <div class="qa"><h3>和直接打开 IDE 有什么区别？</h3><p>IDE 会同时启动代码补全、编译、索引和插件，常常要占几个 GB 内存。DiffCode 只保留 diff、提交、历史和终端，所以打开快，平时只占 30–50 MB 内存。</p></div>
+      <div class="qa"><h3>和直接打开 IDE 有什么区别？</h3><p>在 IDE 里打开项目，要等它加载插件、建好索引，还常常占掉几个 GB 内存。DiffCode 只保留 diff、提交、历史和终端，所以打开快，平时只占 30–50 MB 内存。</p></div>
       <div class="qa"><h3>DiffCode 有多大？</h3><p>两个系统的安装包都在 4 MB 左右，Mac 版装好后大约 8 MB。它是原生应用（Mac 上用 AppKit，Windows 上用 Win32），没有打包浏览器内核或额外的运行时，所以启动快，平时只占 30–50 MB 内存。</p></div>
       <div class="qa"><h3>能看 Claude Code 或 Codex 改了什么吗？</h3><p>能。在 DiffCode 的内置终端里（或者任何地方）运行 agent，它改的每个文件都会实时出现在 diff 里。「与分支比较」可以一次看完 agent 自分叉以来的全部改动。</p></div>
       <div class="qa"><h3>能只提交文件的一部分吗？</h3><p>能。取消勾选某一处改动，或者选中几行不提交，这些改动会留在工作区，下次再提交。</p></div>
