@@ -40,8 +40,8 @@ pub fn sidebar(app: &mut App, vs: &mut ViewState, ui: &mut Ui, platform: &mut dy
 
     let shows_tree = app.current_project().is_some() && !app.git_missing;
     if shows_tree {
-        // The projects take the room they need, up to about a third or as far as the divider was dragged; the tree
-        // gets everything else, and keeps at least its bar.
+        // The projects take the room they need, up to about a third; once the divider has been dragged, exactly that
+        // much, blank space and all. The tree keeps at least its bar.
         let room = area.h;
         let tree_min = t.s(TREE_MINIMUM);
         let chosen = app.settings.projects_height.map(|v| v * t.scale);
@@ -79,14 +79,14 @@ fn choice_range(row: f32, room: f32, tree_min: f32) -> (f32, f32) {
 }
 
 /// Every project when they fit; otherwise a cut that leaves half a row showing, so the list reads as scrollable.
-/// A height the user dragged to (`chosen`) takes the place of the automatic limit, and is a limit too: the projects
-/// never take more than they need. `room` is what the projects, the divider and the tree share.
+/// A height the user dragged to (`chosen`) is kept as it is, even where it leaves room below the projects: that room
+/// takes folders dropped to add them. `room` is what the projects, the divider and the tree share.
 fn projects_height(row: f32, count: usize, available: f32, chosen: Option<f32>, room: f32, tree_min: f32) -> f32 {
     let step = row + ROW_SPACING;
     let all = count.max(1) as f32 * step - ROW_SPACING + BOTTOM_PADDING;
     if let Some(chosen) = chosen {
         let (lo, hi) = choice_range(row, room, tree_min);
-        return all.min(chosen.clamp(lo, hi).round());
+        return chosen.clamp(lo, hi).round();
     }
     let limit = (step * 2.5).max((step * 6.5).min(available * 0.34));
     let auto = if all <= limit { all } else { ((limit / step - 0.5).floor() + 0.5) * step };
@@ -470,13 +470,14 @@ pub fn git_missing(app: &mut App, ui: &mut Ui, area: Rect) {
 mod tests {
     use super::*;
 
-    /// The divider dragged down gives the projects that much, up to the file tree's bar; never more than they need.
+    /// The divider goes where it is dragged, from a row and a half down to the file tree's bar.
     #[test]
-    fn a_dragged_height_is_a_limit_the_projects_fill_up_to() {
+    fn a_dragged_height_is_kept_as_it_is() {
         let (row, room, tree) = (40.0, 700.0, 56.0);
         assert_eq!(projects_height(row, 40, 800.0, Some(600.0), room, tree), 600.0);
         assert_eq!(projects_height(row, 40, 800.0, Some(5000.0), room, tree), room - 1.0 - tree);
-        assert_eq!(projects_height(row, 3, 800.0, Some(600.0), room, tree), projects_height(row, 3, 800.0, None, room, tree));
+        // With a few projects the space under them stays, to drop folders on.
+        assert_eq!(projects_height(row, 3, 800.0, Some(600.0), room, tree), 600.0);
         assert_eq!(projects_height(row, 40, 800.0, Some(0.0), room, tree), 63.0);
         // Automatic: about a third, cut mid-row.
         let auto = projects_height(row, 40, 800.0, None, room, tree);

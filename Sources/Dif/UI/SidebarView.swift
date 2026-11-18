@@ -23,8 +23,8 @@ struct SidebarView: View {
 
                 if let project = store.currentProject, !project.needsAccess, !store.gitMissing {
                     GeometryReader { middle in
-                        // The projects take the room they need, up to about a third or as far as the divider was
-                        // dragged; the tree gets everything else, and keeps at least its bar.
+                        // The projects take the room they need, up to about a third; once the divider has been
+                        // dragged, exactly that much, blank space and all. The tree keeps at least its bar.
                         let height = Self.projectsHeight(count: store.projectRows.count, available: proxy.size.height,
                                                          chosen: store.settings.projectsHeight, room: middle.size.height)
                         VStack(spacing: 0) {
@@ -96,13 +96,13 @@ struct SidebarView: View {
     }
 
     /// Every project when they fit; otherwise a cut that leaves half a row showing, so the list reads as scrollable.
-    /// A height the user dragged to (`chosen`) takes the place of the automatic limit, and is a limit too: the
-    /// projects never take more than they need. `room` is what the projects, the divider and the tree share.
+    /// A height the user dragged to (`chosen`) is kept as it is, even where it leaves room below the projects: that
+    /// room takes folders dropped to add them. `room` is what the projects, the divider and the tree share.
     static func projectsHeight(count: Int, available: CGFloat, chosen: Double? = nil, room: CGFloat = .infinity) -> CGFloat {
         let step = rowHeight + rowSpacing
         let all = CGFloat(max(1, count)) * step - rowSpacing + bottomPadding
         if let chosen {
-            return min(all, CGFloat(clampedChoice(CGFloat(chosen), room: room)))
+            return CGFloat(clampedChoice(CGFloat(chosen), room: room))
         }
         let limit = max(step * 2.5, min(step * 6.5, available * 0.34))
         return max(0, min(room - 1 - treeMinimum, all <= limit ? all : ((limit / step - 0.5).rounded(.down) + 0.5) * step))
