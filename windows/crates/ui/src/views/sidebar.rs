@@ -13,10 +13,13 @@ use crate::icons::Icon;
 use crate::paint::{Overflow, Weight};
 use crate::platform::Platform;
 use crate::ui::{Align, Id, Ui};
-use crate::widgets::{badge, button, button_width, icon_button, scroll_area, ButtonKind};
+use crate::widgets::{badge, button, button_width, icon_button, scroll_area, splitter_clicks, ButtonKind};
 
 const ROW_SPACING: f32 = 2.0;
 const BOTTOM_PADDING: f32 = 6.0;
+/// The file tree's least: its filter bar and the path bar under it, so it can be put nearly out of the way and still
+/// be found.
+const TREE_MINIMUM: f32 = 56.0;
 
 pub fn sidebar(app: &mut App, vs: &mut ViewState, ui: &mut Ui, platform: &mut dyn Platform, rect: Rect) {
     let t = ui.theme;
@@ -37,28 +40,57 @@ pub fn sidebar(app: &mut App, vs: &mut ViewState, ui: &mut Ui, platform: &mut dy
 
     let shows_tree = app.current_project().is_some() && !app.git_missing;
     if shows_tree {
-        // The projects take the room they need, up to about a third; the tree gets everything else.
-        let h = projects_height(t.s(40.0), app.project_rows().len(), rect.h);
+        // The projects take the room they need, up to about a third or as far as the divider was dragged; the tree
+        // gets everything else, and keeps at least its bar.
+        let room = area.h;
+        let tree_min = t.s(TREE_MINIMUM);
+        let chosen = app.settings.projects_height.map(|v| v * t.scale);
+        let h = projects_height(t.s(40.0), app.project_rows().len(), rect.h, chosen, room, tree_min);
         let list = area.take_top(h.min(area.h));
         projects(app, vs, ui, list);
+        let line = area.y;
         ui.hline(area.x, area.y, area.w, t.hairline);
         area.take_top(1.0);
-        file_tree::file_tree(app, vs, ui, platform, area);
+        ui.clipped(area, |ui| file_tree::file_tree(app, vs, ui, platform, area));
+        // Over the line and after both panes, so a drag there resizes rather than scrolls or selects.
+        let mut value = h;
+        let (lo, hi) = choice_range(t.s(40.0), room, tree_min);
+        let (ended, reset) = splitter_clicks(ui, Id::new("split-projects"), Rect::new(area.x, line - 3.0, area.w, 7.0), false, &mut value, lo, hi, 1.0);
+        if reset {
+            // Back to the height that follows the number of projects.
+            app.settings.projects_height = None;
+            app.settings.save();
+        } else if value != h && ui.st.is_active(Id::new("split-projects")) && (ui.mouse().y - ui.press_pos().y).abs() >= 1.0 {
+            // Only a drag that moved: a click on the divider leaves the height as it was, automatic or not.
+            app.settings.projects_height = Some(value / t.scale);
+        }
+        if ended {
+            app.settings.save();
+        }
     } else {
         projects(app, vs, ui, area);
     }
 }
 
+/// What a drag of the divider may ask for: a row and a half at least, and room left for the tree's bar.
+fn choice_range(row: f32, room: f32, tree_min: f32) -> (f32, f32) {
+    let least = ((row + ROW_SPACING) * 1.5).round();
+    (least, (room - 1.0 - tree_min).max(least))
+}
+
 /// Every project when they fit; otherwise a cut that leaves half a row showing, so the list reads as scrollable.
-fn projects_height(row: f32, count: usize, available: f32) -> f32 {
+/// A height the user dragged to (`chosen`) takes the place of the automatic limit, and is a limit too: the projects
+/// never take more than they need. `room` is what the projects, the divider and the tree share.
+fn projects_height(row: f32, count: usize, available: f32, chosen: Option<f32>, room: f32, tree_min: f32) -> f32 {
     let step = row + ROW_SPACING;
     let all = count.max(1) as f32 * step - ROW_SPACING + BOTTOM_PADDING;
-    let limit = (step * 2.5).max((step * 6.5).min(available * 0.34));
-    if all <= limit {
-        all
-    } else {
-        ((limit / step - 0.5).floor() + 0.5) * step
+    if let Some(chosen) = chosen {
+        let (lo, hi) = choice_range(row, room, tree_min);
+        return all.min(chosen.clamp(lo, hi).round());
     }
+    let limit = (step * 2.5).max((step * 6.5).min(available * 0.34));
+    let auto = if all <= limit { all } else { ((limit / step - 0.5).floor() + 0.5) * step };
+    auto.min(room - 1.0 - tree_min).max(0.0)
 }
 
 fn projects(app: &mut App, vs: &mut ViewState, ui: &mut Ui, rect: Rect) {
@@ -431,5 +463,24 @@ pub fn git_missing(app: &mut App, ui: &mut Ui, area: Rect) {
     }
     if button(ui, Id::new("git-again"), Rect::new(x + w1 + gap, y, w2, button_h), &again, ButtonKind::Secondary, true).clicked {
         app.check_git_again();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The divider dragged down gives the projects that much, up to the file tree's bar; never more than they need.
+    #[test]
+    fn a_dragged_height_is_a_limit_the_projects_fill_up_to() {
+        let (row, room, tree) = (40.0, 700.0, 56.0);
+        assert_eq!(projects_height(row, 40, 800.0, Some(600.0), room, tree), 600.0);
+        assert_eq!(projects_height(row, 40, 800.0, Some(5000.0), room, tree), room - 1.0 - tree);
+        assert_eq!(projects_height(row, 3, 800.0, Some(600.0), room, tree), projects_height(row, 3, 800.0, None, room, tree));
+        assert_eq!(projects_height(row, 40, 800.0, Some(0.0), room, tree), 63.0);
+        // Automatic: about a third, cut mid-row.
+        let auto = projects_height(row, 40, 800.0, None, room, tree);
+        assert!(auto <= 800.0 * 0.34);
+        assert!(((auto / 42.0) - (auto / 42.0).floor() - 0.5).abs() < 0.01);
     }
 }

@@ -3,6 +3,8 @@ import SwiftUI
 /// Left column: the projects, and under them the file tree of the one that is selected.
 struct SidebarView: View {
     @Environment(AppStore.self) private var store
+    /// The projects' height when a drag of the divider under them began.
+    @State private var dragStart: CGFloat?
 
     var body: some View {
         GeometryReader { proxy in
@@ -20,11 +22,32 @@ struct SidebarView: View {
                 .padding(.bottom, 4)
 
                 if let project = store.currentProject, !project.needsAccess, !store.gitMissing {
-                    // The projects take the room they need, up to about a third; the tree gets everything else.
-                    projects.frame(height: Self.projectsHeight(count: store.projectRows.count, available: proxy.size.height))
-                    Rectangle().fill(Color.difHairline).frame(height: 1)
-                    FileTreePanel(project: project)
-                        .id(project.id)
+                    GeometryReader { middle in
+                        // The projects take the room they need, up to about a third or as far as the divider was
+                        // dragged; the tree gets everything else, and keeps at least its bar.
+                        let height = Self.projectsHeight(count: store.projectRows.count, available: proxy.size.height,
+                                                         chosen: store.settings.projectsHeight, room: middle.size.height)
+                        VStack(spacing: 0) {
+                            projects.frame(height: height)
+                            DividerGrip(axis: .rows, color: .difHairline, onDrag: { translation in
+                                guard let translation else {
+                                    dragStart = nil
+                                    store.settings.save()
+                                    return
+                                }
+                                let start = dragStart ?? height
+                                if dragStart == nil { dragStart = height }
+                                store.settings.projectsHeight = Self.clampedChoice(start + translation, room: middle.size.height)
+                            }, onDoubleClick: {
+                                // Back to the height that follows the number of projects.
+                                store.settings.projectsHeight = nil
+                                store.settings.save()
+                            })
+                            FileTreePanel(project: project)
+                                .id(project.id)
+                                .clipped()
+                        }
+                    }
                 } else {
                     projects
                 }
@@ -62,12 +85,27 @@ struct SidebarView: View {
     private static let rowSpacing: CGFloat = 2
     private static let bottomPadding: CGFloat = 6
 
+    /// The file tree's least: its filter bar and the project's name under it, so it can be put nearly out of the
+    /// way and still be found.
+    static var treeMinimum: CGFloat { UI.s(56) }
+
+    /// What a drag of the divider may ask for: a row and a half at least, and room left for the tree's bar.
+    static func clampedChoice(_ height: CGFloat, room: CGFloat) -> Double {
+        let step = rowHeight + rowSpacing
+        return Double(max(step * 1.5, min(height, room - 1 - treeMinimum)).rounded())
+    }
+
     /// Every project when they fit; otherwise a cut that leaves half a row showing, so the list reads as scrollable.
-    static func projectsHeight(count: Int, available: CGFloat) -> CGFloat {
+    /// A height the user dragged to (`chosen`) takes the place of the automatic limit, and is a limit too: the
+    /// projects never take more than they need. `room` is what the projects, the divider and the tree share.
+    static func projectsHeight(count: Int, available: CGFloat, chosen: Double? = nil, room: CGFloat = .infinity) -> CGFloat {
         let step = rowHeight + rowSpacing
         let all = CGFloat(max(1, count)) * step - rowSpacing + bottomPadding
+        if let chosen {
+            return min(all, CGFloat(clampedChoice(CGFloat(chosen), room: room)))
+        }
         let limit = max(step * 2.5, min(step * 6.5, available * 0.34))
-        return all <= limit ? all : ((limit / step - 0.5).rounded(.down) + 0.5) * step
+        return max(0, min(room - 1 - treeMinimum, all <= limit ? all : ((limit / step - 0.5).rounded(.down) + 0.5) * step))
     }
 }
 

@@ -111,6 +111,8 @@ final class Settings {
     var listWidth: Double
     var terminalHeight: Double
     var commitBoxHeight: Double
+    /// How tall the projects may grow above the file tree, as the user dragged it; nil is automatic.
+    var projectsHeight: Double?
     /// Keep the file tree's selection on whatever file the viewer is showing.
     var followFile: Bool
 
@@ -136,6 +138,7 @@ final class Settings {
         commitBoxHeight = min(Self.commitBoxRange.upperBound,
                               max(Self.commitBoxRange.lowerBound, defaults.object(forKey: "commitBoxHeight") as? Double ?? 140))
         followFile = defaults.object(forKey: "followFile") as? Bool ?? false
+        projectsHeight = (defaults.object(forKey: "projectsHeight") as? Double).map { max(0, $0) }
     }
 
     func save() {
@@ -153,6 +156,7 @@ final class Settings {
         defaults.set(terminalHeight, forKey: "terminalHeight")
         defaults.set(commitBoxHeight, forKey: "commitBoxHeight")
         defaults.set(followFile, forKey: "followFile")
+        defaults.set(projectsHeight, forKey: "projectsHeight")  // nil removes the key
         // Not the language: it is written when chosen, so that quitting never puts back a stale one over a
         // choice made since in System Settings.
     }

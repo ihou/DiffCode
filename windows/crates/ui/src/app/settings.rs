@@ -96,6 +96,8 @@ pub struct Settings {
     pub list_width: f32,
     pub terminal_height: f32,
     pub commit_box_height: f32,
+    /// How tall the projects may grow above the file tree, as the user dragged it (unscaled); None is automatic.
+    pub projects_height: Option<f32>,
     /// Keep the file tree's selection on whatever file the viewer shows.
     pub follow_file: bool,
     /// Projects in the sidebar, in order, and the one selected.
@@ -135,6 +137,7 @@ impl Default for Settings {
             list_width: 300.0,
             terminal_height: 280.0,
             commit_box_height: 140.0,
+            projects_height: None,
             follow_file: false,
             projects: Vec::new(),
             selected_project: None,
@@ -203,6 +206,7 @@ impl Settings {
         if let Some(v) = f("commitBoxHeight") {
             s.commit_box_height = clamp(v, COMMIT_BOX_RANGE);
         }
+        s.projects_height = f("projectsHeight").map(|v| v.max(0.0));
         s.follow_file = b("followFile").unwrap_or(false);
         s.check_updates = b("checkUpdates").unwrap_or(true);
         s.skipped_update = map.get("skippedUpdate").filter(|v| !v.is_empty()).map(|v| v.to_string());
@@ -246,6 +250,9 @@ impl Settings {
         put("listWidth", self.list_width.to_string());
         put("terminalHeight", self.terminal_height.to_string());
         put("commitBoxHeight", self.commit_box_height.to_string());
+        if let Some(v) = self.projects_height {
+            put("projectsHeight", v.to_string());
+        }
         put("followFile", self.follow_file.to_string());
         put("checkUpdates", self.check_updates.to_string());
         if let Some(v) = &self.skipped_update {

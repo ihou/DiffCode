@@ -654,17 +654,19 @@ enum DebugHooks {
             backdrop.backgroundColor = NSColor(hex: hex)
             backdrop.isReleasedWhenClosed = false
             backdrop.order(.below, relativeTo: window.windowNumber)
-        case "click":
+        case "click", "doubleclick":
             // "click:x,y" in window points from the top-left: a real left click, queued as the mouse would queue it.
-            // Only reaches a window that is key, which a launched test run is.
+            // Only reaches a window that is key, which a launched test run is. "doubleclick:x,y" clicks twice.
             guard let window = store.window, let content = window.contentView else { break }
             let xy = argument.split(separator: ",").compactMap { Double($0) }
             guard xy.count == 2 else { break }
             let location = NSPoint(x: xy[0], y: content.bounds.height - xy[1])
-            for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-                if let event = NSEvent.mouseEvent(with: type, location: location, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
-                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
-                    NSApp.postEvent(event, atStart: false)
+            for count in parts[0] == "doubleclick" ? [1, 2] : [1] {
+                for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+                    if let event = NSEvent.mouseEvent(with: type, location: location, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                                      windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: count, pressure: 1) {
+                        NSApp.postEvent(event, atStart: false)
+                    }
                 }
             }
         case "move":

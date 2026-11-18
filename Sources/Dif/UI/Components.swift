@@ -654,6 +654,7 @@ private struct GripArea: NSViewRepresentable {
     var axis: ResizeAxis
     var onHover: (Bool) -> Void
     var onDrag: (CGFloat?) -> Void
+    var onDoubleClick: (() -> Void)?
 
     func makeNSView(context: Context) -> GripView { GripView() }
 
@@ -664,12 +665,14 @@ private struct GripArea: NSViewRepresentable {
         }
         view.onHover = onHover
         view.onDrag = onDrag
+        view.onDoubleClick = onDoubleClick
     }
 
     final class GripView: NSView {
         var axis = ResizeAxis.columns
         var onHover: ((Bool) -> Void)?
         var onDrag: ((CGFloat?) -> Void)?
+        var onDoubleClick: (() -> Void)?
         private var origin: NSPoint?
 
         override var mouseDownCanMoveWindow: Bool { false }
@@ -692,6 +695,10 @@ private struct GripArea: NSViewRepresentable {
         override func mouseExited(with event: NSEvent) { if origin == nil { onHover?(false) } }
 
         override func mouseDown(with event: NSEvent) {
+            if event.clickCount == 2, let onDoubleClick {
+                onDoubleClick()
+                return
+            }
             origin = event.locationInWindow
             axis.cursor.set()
         }
@@ -721,6 +728,8 @@ struct DividerGrip: View {
     var color = Color.difBorder
     /// The drag's translation along the axis since it began, or nil once it has ended.
     var onDrag: (CGFloat?) -> Void
+    /// A double-click on the divider, where it puts something back (nil: a double-click is two clicks).
+    var onDoubleClick: (() -> Void)? = nil
     @State private var hovering = false
     @State private var dragging = false
 
@@ -741,7 +750,7 @@ struct DividerGrip: View {
                 GripArea(axis: axis, onHover: { hovering = $0 }, onDrag: { translation in
                     dragging = translation != nil
                     onDrag(translation)
-                })
+                }, onDoubleClick: onDoubleClick)
                 .frame(width: axis == .columns ? Self.grabWidth : nil, height: axis == .rows ? Self.grabWidth : nil)
                 .resizePointer(axis)
             )

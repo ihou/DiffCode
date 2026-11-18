@@ -257,7 +257,16 @@ pub fn vscrollbar(ui: &mut Ui, id: Id, rect: Rect, content: f32, scroll: &mut Sc
 /// it. Returns true when a drag ended (time to save the setting).
 #[allow(clippy::too_many_arguments)]
 pub fn splitter(ui: &mut Ui, id: Id, rect: Rect, vertical_bar: bool, value: &mut f32, min: f32, max: f32, sign: f32) -> bool {
+    splitter_clicks(ui, id, rect, vertical_bar, value, min, max, sign).0
+}
+
+/// `splitter`, and whether the edge was double-clicked this frame (where that puts something back).
+#[allow(clippy::too_many_arguments)]
+pub fn splitter_clicks(ui: &mut Ui, id: Id, rect: Rect, vertical_bar: bool, value: &mut f32, min: f32, max: f32, sign: f32) -> (bool, bool) {
     let r = ui.interact(id, rect);
+    if r.double_clicked {
+        return (false, true);
+    }
     let cursor = if vertical_bar { CursorIcon::ResizeHorizontal } else { CursorIcon::ResizeVertical };
     if r.hovered || r.dragging {
         ui.set_cursor(cursor);
@@ -275,7 +284,7 @@ pub fn splitter(ui: &mut Ui, id: Id, rect: Rect, vertical_bar: bool, value: &mut
         let d = if vertical_bar { m.x - p.x } else { m.y - p.y };
         *value = (start + sign * d).clamp(min, max.max(min)).round();
     }
-    matches!(ui.event, Some(Event::MouseUp { .. })) && ui.st.is_active(id)
+    (matches!(ui.event, Some(Event::MouseUp { .. })) && ui.st.is_active(id), false)
 }
 
 // MARK: Tooltips

@@ -136,6 +136,22 @@ final class SidebarLayoutTests: XCTestCase {
         // Even in a short sidebar a couple of projects stay reachable.
         XCTAssertGreaterThanOrEqual(SidebarView.projectsHeight(count: 40, available: 200), SidebarView.rowHeight * 2)
     }
+
+    /// The divider dragged down gives the projects that much, up to the file tree's bar; never more than they need.
+    func testADraggedHeightIsALimitTheProjectsFillUpTo() {
+        let room: CGFloat = 700
+        let mostOfIt = SidebarView.projectsHeight(count: 40, available: 800, chosen: 600, room: room)
+        XCTAssertEqual(mostOfIt, 600)
+        // Dragged all the way down, the tree keeps its bar.
+        let all = SidebarView.projectsHeight(count: 40, available: 800, chosen: 5000, room: room)
+        XCTAssertEqual(all, (room - 1 - SidebarView.treeMinimum).rounded())
+        // A few projects take what they need, and the tree the rest, however far the divider went.
+        XCTAssertEqual(SidebarView.projectsHeight(count: 3, available: 800, chosen: 600, room: room),
+                       SidebarView.projectsHeight(count: 3, available: 800))
+        // Dragged up, a row and a half stays.
+        let least = SidebarView.projectsHeight(count: 40, available: 800, chosen: 0, room: room)
+        XCTAssertEqual(least, ((SidebarView.rowHeight + 2) * 1.5).rounded())
+    }
 }
 
 final class ShellTests: XCTestCase {
