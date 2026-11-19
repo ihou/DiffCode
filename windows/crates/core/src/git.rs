@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use crate::remote::{self, RepoOperation};
 use crate::text_codec;
 use crate::util::{natural_cmp, split_max, split_nul, split_nul_keep_empty};
+use crate::wsl;
 
 /// SHA of git's well-known empty tree; used as the base of a repo with no commits.
 pub const EMPTY_TREE: &str = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -281,9 +282,22 @@ impl Cmd {
     }
 
     fn command(&self) -> Command {
-        let mut c = Command::new(executable());
-        c.args(BASE_ARGS).args(&self.args).current_dir(&self.dir);
+        let wsl = wsl::location(&self.dir);
+        let mut c = match &wsl {
+            // A repository inside WSL: the distro's own git, in the same folder seen from inside.
+            Some(at) => {
+                let mut c = Command::new("wsl.exe");
+                c.args(at.command_line("git")).args(BASE_ARGS).args(self.args.iter().map(|a| at.linux_argument(a)));
+                c
+            }
+            None => {
+                let mut c = Command::new(executable());
+                c.args(BASE_ARGS).args(&self.args).current_dir(&self.dir);
+                c
+            }
+        };
         c.env_clear();
+        let mut passed: Vec<&str> = Vec::new();
         for (k, v) in base_environment() {
             if !self.env.iter().any(|(ek, _)| ek == k) {
                 c.env(k, v);
@@ -291,9 +305,25 @@ impl Cmd {
         }
         for (k, v) in &self.env {
             c.env(k, v);
+            passed.push(k);
+        }
+        if wsl.is_some() {
+            // wsl.exe hands the distro only the variables WSLENV names.
+            passed.extend(["GIT_OPTIONAL_LOCKS", "GIT_TERMINAL_PROMPT", "GIT_PAGER", "LC_ALL"]);
+            let existing = base_environment().iter().find(|(k, _)| k.eq_ignore_ascii_case("WSLENV")).map(|(_, v)| v.as_str());
+            c.env("WSLENV", wsl::environment_list(existing, &passed));
         }
         hide_console(&mut c);
         c
+    }
+
+    /// Why the program could not start, said for what it was: git, or wsl.exe for a repository inside WSL.
+    fn spawn_error(&self, e: std::io::Error) -> Error {
+        if wsl::location(&self.dir).is_some() {
+            Error::Spawn(wsl::not_started(&e.to_string()))
+        } else {
+            Error::Spawn(format!("Could not run git: {e}"))
+        }
     }
 
     /// Runs git and returns stdout. Fails unless the exit status is one of the accepted ones.
@@ -303,7 +333,7 @@ impl Cmd {
             .stdin(if self.stdin.is_some() { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        let mut child = command.spawn().map_err(|e| Error::Spawn(format!("Could not run git: {e}")))?;
+        let mut child = command.spawn().map_err(|e| self.spawn_error(e))?;
         if let Some(token) = &self.cancel {
             token.attach(child.id());
         }
@@ -341,11 +371,17 @@ impl Cmd {
         if self.ok.contains(&code) {
             return Ok(out);
         }
-        let mut msg = String::from_utf8_lossy(&err).trim().to_string();
+        // wsl.exe's own messages (no such distro, no git there) come in UTF-16.
+        let wsl = wsl::location(&self.dir);
+        let text = |data: &[u8]| if wsl.is_some() { wsl::decode_output(data) } else { String::from_utf8_lossy(data).into_owned() };
+        let mut msg = text(&err).trim().to_string();
         // Some commands report on stdout (a merge's CONFLICT lines); keep that too, briefly.
-        let head = String::from_utf8_lossy(&out[..out.len().min(4096)]).trim().to_string();
+        let head = text(&out[..out.len().min(4096)]).trim().to_string();
         if !head.is_empty() && (head.contains("CONFLICT") || msg.is_empty()) {
             msg = if msg.is_empty() { head } else { format!("{head}\n{msg}") };
+        }
+        if let Some(at) = &wsl {
+            msg = wsl::explain(&msg, &at.distro);
         }
         Err(Error::Failed { status: code, message: msg })
     }
@@ -358,7 +394,7 @@ impl Cmd {
     pub fn stream(self, mut on_chunk: impl FnMut(&[u8]) -> bool) -> Result<()> {
         let mut command = self.command();
         command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
-        let mut child = command.spawn().map_err(|e| Error::Spawn(format!("Could not run git: {e}")))?;
+        let mut child = command.spawn().map_err(|e| self.spawn_error(e))?;
         let token = self.cancel.clone().unwrap_or_default();
         token.attach(child.id());
         let mut stdout = child.stdout.take().expect("piped stdout");
@@ -406,7 +442,7 @@ where
 pub fn repository_root(path: &Path) -> Option<PathBuf> {
     let out = run_string(path, ["rev-parse", "--show-toplevel"]).ok()?;
     let p = out.trim();
-    if p.is_empty() { None } else { Some(PathBuf::from(normalize_git_path(p))) }
+    if p.is_empty() { None } else { Some(path_from_git(path, p)) }
 }
 
 /// Why git would not take a folder as a repository, when the reason is not just that there is none.
@@ -447,6 +483,15 @@ pub fn normalize_git_path(p: &str) -> String {
     if cfg!(windows) { p.replace('/', "\\") } else { p.to_string() }
 }
 
+/// A path git printed when run in `dir`, as a native path: for a repository inside WSL, git spoke from inside the
+/// distro (`/home/me/app`), so it is put back on the share (`\\wsl.localhost\Ubuntu\home\me\app`).
+pub fn path_from_git(dir: &Path, p: &str) -> PathBuf {
+    match wsl::location(dir) {
+        Some(at) if p.starts_with('/') => at.windows_path(p),
+        _ => PathBuf::from(normalize_git_path(p)),
+    }
+}
+
 /// One of a repository's work trees, as `git worktree list` has it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Worktree {
@@ -460,14 +505,14 @@ pub struct Worktree {
 
 /// The repository's work trees, the main one first. Empty when git could not say.
 pub fn worktrees(dir: &Path) -> Vec<Worktree> {
-    run_string(dir, ["worktree", "list", "--porcelain"]).map(|text| parse_worktrees(&text)).unwrap_or_default()
+    run_string(dir, ["worktree", "list", "--porcelain"]).map(|text| parse_worktrees(&text, |p| path_from_git(dir, p))).unwrap_or_default()
 }
 
-pub fn parse_worktrees(text: &str) -> Vec<Worktree> {
+pub fn parse_worktrees(text: &str, path: impl Fn(&str) -> PathBuf) -> Vec<Worktree> {
     let mut list: Vec<Worktree> = Vec::new();
     for line in text.lines() {
-        if let Some(path) = line.strip_prefix("worktree ") {
-            list.push(Worktree { path: PathBuf::from(normalize_git_path(path)), ..Default::default() });
+        if let Some(p) = line.strip_prefix("worktree ") {
+            list.push(Worktree { path: path(p), ..Default::default() });
         } else if let Some(last) = list.last_mut() {
             if let Some(branch) = line.strip_prefix("branch ") {
                 last.branch = Some(branch.to_string());
@@ -1163,7 +1208,7 @@ mod tests {
     fn work_trees_are_read_from_git() {
         let text = "worktree /w/ws\nHEAD 4d15\nbranch refs/heads/main\n\nworktree /w/ws-fix\nHEAD 4d15\nbranch refs/heads/fix\n\n\
 worktree /w/gone\nHEAD 4d15\ndetached\nprunable gitdir file points to non-existent location\n\nworktree /w/bare\nbare\n";
-        let list = parse_worktrees(text);
+        let list = parse_worktrees(text, |p| PathBuf::from(normalize_git_path(p)));
         assert_eq!(list.len(), 4);
         assert_eq!(list[1].branch.as_deref(), Some("refs/heads/fix"));
         assert!(list[2].is_prunable && list[2].branch.is_none());

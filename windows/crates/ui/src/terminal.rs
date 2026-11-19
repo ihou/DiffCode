@@ -99,6 +99,14 @@ impl Shell {
         }
     }
 
+    /// The shell for a terminal in `directory`: inside WSL, the distro's own shell, started in that folder.
+    pub fn for_directory(directory: &Path) -> Shell {
+        match crate::core::wsl::location(directory) {
+            Some(at) => Shell { program: "wsl.exe".into(), args: vec!["-d".into(), at.distro, "--cd".into(), at.linux], kind: ShellKind::Posix },
+            None => Shell::default_shell(),
+        }
+    }
+
     /// The program's name without its folder or `.exe`.
     pub fn name(&self) -> String {
         process_name(&self.program)
@@ -176,7 +184,7 @@ impl Session {
         let listener = Listener { id, tx, waker };
         let config = Config { scrolling_history: SCROLLBACK_LINES, ..Config::default() };
         let term = Term::new(config, &GridSize { columns: 80, lines: 24 }, listener.clone());
-        let shell = Shell::default_shell();
+        let shell = Shell::for_directory(&directory);
         Session {
             id,
             project,
@@ -222,6 +230,11 @@ impl Session {
     }
 
     /// Launches the shell, sized for the pane it is in, so the first prompt is laid out for it.
+    /// A path as this terminal's shell reaches it: a Windows path is put as the distro sees it in a WSL terminal.
+    pub fn shell_path(&self, path: &str) -> String {
+        crate::core::wsl::location(&self.directory).and_then(|at| at.linux_path(path)).unwrap_or_else(|| path.to_string())
+    }
+
     pub fn start(&mut self, columns: usize, lines: usize, cell: (f32, f32)) {
         if self.is_started {
             return;
@@ -235,6 +248,11 @@ impl Session {
         env.insert("COLORTERM".to_string(), "truecolor".to_string());
         env.insert("TERM_PROGRAM".to_string(), "DiffCode".to_string());
         env.insert("TERM_PROGRAM_VERSION".to_string(), env!("CARGO_PKG_VERSION").to_string());
+        if crate::core::wsl::location(&self.directory).is_some() {
+            // A distro's shell sees only the variables WSLENV names.
+            let names = ["TERM", "COLORTERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION"];
+            env.insert("WSLENV".to_string(), crate::core::wsl::environment_list(std::env::var("WSLENV").ok().as_deref(), &names));
+        }
         let options = tty::Options {
             shell: Some(tty::Shell::new(self.shell.program.clone(), self.shell.args.clone())),
             working_directory: Some(directory),
