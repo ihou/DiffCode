@@ -245,7 +245,8 @@ struct CommitMessageEditor: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let view = notification.object as? NSTextView else { return }
-            if parent.text != view.string { parent.text = view.string }
+            // Letters an input method is still composing are not the message yet.
+            if !view.hasMarkedText(), parent.text != view.string { parent.text = view.string }
             view.needsDisplay = true
         }
 
@@ -299,8 +300,12 @@ struct CommitMessageEditor: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         guard let view = scroll.documentView as? TextView else { return }
         context.coordinator.parent = self
-        configure(view)
-        if view.string != text { view.string = text }
+        // Never while an input method composes: replacing the text then threw the composition away, so pinyin typed
+        // while the changes refreshed was lost.
+        if !view.hasMarkedText() {
+            configure(view)
+            if view.string != text { view.string = text }
+        }
         if context.coordinator.lastToken != focusToken {
             let first = context.coordinator.lastToken == Int.min
             context.coordinator.lastToken = focusToken

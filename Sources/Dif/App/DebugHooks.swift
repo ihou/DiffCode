@@ -190,6 +190,16 @@ enum DebugHooks {
             store.terminals.sessions.forEach { $0.pollForeground() }
             let lines = store.terminals.sessions.map { "\($0.processName)|\($0.title.suffix(30)) busy=\($0.isBusy) attention=\($0.needsAttention) started=\($0.isStarted) cols=\($0.view.getTerminal().cols) rows=\($0.view.getTerminal().rows)" }
             FileHandle.standardError.write(Data("terminals: visible=\(store.terminals.isVisible) focused=\(store.terminals.focusedID != nil) \(lines)\n".utf8))
+        case "termline":
+            // The focused terminal's cursor line, and whether an input method is composing there.
+            if let session = store.terminals.sessions.first(where: { $0.id == store.terminals.focusedID }) ?? store.terminals.sessions.first {
+                let terminal = session.view.getTerminal()
+                let row = terminal.getCursorLocation().y
+                let line = terminal.getLine(row: row)?.translateToString(trimRight: true) ?? ""
+                FileHandle.standardError.write(Data("termline \(line) marked=\(session.view.hasMarkedText())\n".utf8))
+            } else {
+                FileHandle.standardError.write(Data("termline none (\(store.terminals.sessions.count) sessions)\n".utf8))
+            }
         case "focusviewer": store.focusViewer()
         case "projectstate":
             // What the sandbox lets each project do: whether its folder is open, what git said.
@@ -762,6 +772,29 @@ enum DebugHooks {
             // The input method commits its composition as `argument`.
             store.viewer.container?.canvas.insertText(unescape(argument), replacementRange: NSRange(location: NSNotFound, length: 0))
         case "unmark": store.viewer.container?.canvas.unmarkText()
+        case "fieldmarked":
+            // An input method's composition in the text field that has the keyboard (its field editor).
+            let text = unescape(argument)
+            guard let editor = store.window?.firstResponder as? NSTextView else { FileHandle.standardError.write(Data("fieldmarked: no field editor\n".utf8)); break }
+            editor.setMarkedText(text, selectedRange: NSRange(location: (text as NSString).length, length: 0),
+                                 replacementRange: NSRange(location: NSNotFound, length: 0))
+        case "fieldtype":
+            // "fieldtype:你|hao": the input method commits the first part, and straight away starts composing the
+            // second, as typing 你 then h, a, o does.
+            guard let editor = store.window?.firstResponder as? NSTextView else { break }
+            let pieces = unescape(argument).split(separator: "|", maxSplits: 1).map(String.init)
+            editor.insertText(pieces[0], replacementRange: NSRange(location: NSNotFound, length: 0))
+            if pieces.count > 1 {
+                editor.setMarkedText(pieces[1], selectedRange: NSRange(location: (pieces[1] as NSString).length, length: 0),
+                                     replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+        case "fieldcommit":
+            guard let editor = store.window?.firstResponder as? NSTextView else { break }
+            editor.insertText(unescape(argument), replacementRange: NSRange(location: NSNotFound, length: 0))
+        case "fieldstate":
+            let editor = store.window?.firstResponder as? NSTextView
+            FileHandle.standardError.write(Data(("fieldstate text=\(editor?.string ?? "-") marked=\(editor?.hasMarkedText() ?? false) " +
+                "range=\(editor.map { NSStringFromRange($0.markedRange()) } ?? "-") field=\((editor?.delegate as? NSTextField)?.stringValue ?? "-") hits=\(store.finder.hits.count) finder=\(store.finder.query) responder=\(store.window?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil") popup=\(String(describing: store.popup))\n").utf8))
         case "save": store.viewer.saveNow()
         case "editundo": store.viewer.container?.canvas.undoTyping()
         case "editredo": store.viewer.container?.canvas.redoTyping()

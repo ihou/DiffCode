@@ -265,7 +265,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             case .keyDown:
                 self.shiftDownAt = nil
                 self.lastShiftTap = nil
-                if event.keyCode == 53, self.store.popup != nil {
+                // Escape while an input method composes is the input method's: it drops the composition.
+                let composing = (self.store.window?.firstResponder as? NSTextView)?.hasMarkedText() ?? false
+                if event.keyCode == 53, self.store.popup != nil, !composing {
                     self.store.dismissPopup()
                     return nil
                 }

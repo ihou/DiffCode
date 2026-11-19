@@ -55,6 +55,8 @@ struct SearchField: NSViewRepresentable {
 
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSTextField else { return }
+            // Letters an input method is still composing (pinyin before a candidate is picked) are not the text yet.
+            if SearchField.isComposing(field) { return }
             if parent.text != field.stringValue { parent.text = field.stringValue }
         }
 
@@ -96,10 +98,19 @@ struct SearchField: NSViewRepresentable {
         return field
     }
 
+    /// Whether an input method is composing in the field: its value then holds letters that are not the text yet.
+    static func isComposing(_ field: NSTextField) -> Bool {
+        (field.currentEditor() as? NSTextView)?.hasMarkedText() ?? false
+    }
+
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.parent = self
-        if field.stringValue != text { field.stringValue = text }
-        if field.font != font { field.font = font }
+        // Never while composing: setting the value then ended the composition and left its letters in the field
+        // (typing 你 started a search, and its results redrew the field halfway through the next word's pinyin).
+        if !Self.isComposing(field) {
+            if field.stringValue != text { field.stringValue = text }
+            if field.font != font { field.font = font }
+        }
         if context.coordinator.lastToken != focusToken {
             context.coordinator.lastToken = focusToken
             DispatchQueue.main.async {
