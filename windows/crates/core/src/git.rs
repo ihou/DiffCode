@@ -409,6 +409,39 @@ pub fn repository_root(path: &Path) -> Option<PathBuf> {
     if p.is_empty() { None } else { Some(PathBuf::from(normalize_git_path(p))) }
 }
 
+/// Why git would not take a folder as a repository, when the reason is not just that there is none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Refusal {
+    /// Git's own words, without "fatal: ".
+    pub message: String,
+    /// For a repository that belongs to another user: the command git suggests to trust it.
+    pub trust_command: Option<String>,
+}
+
+/// Asks git why the folder is no repository. None when it simply is none (or is one after all): "No Git repository
+/// found there" is then the truth. Otherwise git's reason, such as a repository owned by another user, which git
+/// refuses unless trusted with `safe.directory` (issue #7: a repository inside WSL, opened from Windows), or git
+/// not starting at all.
+pub fn refusal(path: &Path, env: &[(&str, &str)]) -> Option<Refusal> {
+    let command = env.iter().fold(cmd(path, ["rev-parse", "--show-toplevel"]), |c, (k, v)| c.env(k, *v));
+    match command.run() {
+        Ok(_) | Err(Error::Cancelled) => None,
+        Err(Error::Spawn(message)) => Some(Refusal { message, trust_command: None }),
+        Err(Error::Failed { message, .. }) => parse_refusal(&message),
+    }
+}
+
+pub fn parse_refusal(text: &str) -> Option<Refusal> {
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let first = lines.iter().find(|l| !l.is_empty())?;
+    if first.contains("not a git repository") {
+        return None;
+    }
+    let message = first.strip_prefix("fatal: ").or_else(|| first.strip_prefix("error: ")).unwrap_or(first).to_string();
+    let trust_command = lines.iter().find(|l| l.starts_with("git config") && l.contains("safe.directory")).map(|l| l.to_string());
+    Some(Refusal { message, trust_command })
+}
+
 /// git prints Windows paths with forward slashes ("C:/work/app"); turn them into native ones.
 pub fn normalize_git_path(p: &str) -> String {
     if cfg!(windows) { p.replace('/', "\\") } else { p.to_string() }
@@ -1135,6 +1168,27 @@ worktree /w/gone\nHEAD 4d15\ndetached\nprunable gitdir file points to non-existe
         assert_eq!(list[1].branch.as_deref(), Some("refs/heads/fix"));
         assert!(list[2].is_prunable && list[2].branch.is_none());
         assert!(list[3].is_bare);
+    }
+
+    /// Issue #7: a repository git refuses (here one it takes for another user's) says why, instead of "none there".
+    #[test]
+    fn a_refused_repository_says_why() {
+        if !is_available() {
+            return;
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let repository = dir.path().join("repository");
+        let plain = dir.path().join("plain");
+        std::fs::create_dir_all(&repository).unwrap();
+        std::fs::create_dir_all(&plain).unwrap();
+        cmd(&repository, ["init", "-q"]).run().unwrap();
+        let refused = refusal(&repository, &[("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")]).expect("refused");
+        assert!(refused.message.starts_with("detected dubious ownership"), "{refused:?}");
+        assert!(refused.trust_command.unwrap().starts_with("git config --global --add safe.directory"));
+        // A repository git takes, and a folder that is none, have nothing to explain.
+        assert_eq!(refusal(&repository, &[]), None);
+        assert_eq!(refusal(&plain, &[]), None);
+        assert_eq!(parse_refusal("fatal: something else went wrong\r\n").map(|r| r.message), Some("something else went wrong".into()));
     }
 
     /// Issue #5: a workspace that is a repository itself, with others in it.
