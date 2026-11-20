@@ -107,9 +107,17 @@ impl Shell {
         }
     }
 
-    /// The program's name without its folder or `.exe`.
+    /// The program's name without its folder or `.exe`; a distro's shell goes by the distro, which says more than "wsl".
     pub fn name(&self) -> String {
-        process_name(&self.program)
+        let name = process_name(&self.program);
+        if name.eq_ignore_ascii_case("wsl") {
+            if let [flag, distro, ..] = self.args.as_slice() {
+                if flag == "-d" {
+                    return distro.clone();
+                }
+            }
+        }
+        name
     }
 
     /// Quotes `text` so this shell reads it back as one word. Plain paths are left as they are.
@@ -413,10 +421,18 @@ pub fn same_dir(a: &Path, b: &Path) -> bool {
 /// The program in the foreground under a shell, from a list of running processes (id, parent id, executable):
 /// the deepest of the shell's descendants, the newest of equals, leaving out console hosts. None when the shell has
 /// nothing running.
+///
+/// A distro's shell (`wsl.exe`) never counts as busy: under it are only WSL's own processes (a second `wsl.exe`, then
+/// `wslhost.exe`), and what runs inside the distro is no Windows process at all.
 pub fn foreground_among(processes: &[(u32, u32, String)], shell: u32) -> Option<String> {
+    let is_wsl = processes.iter().any(|(pid, _, name)| *pid == shell && name.eq_ignore_ascii_case("wsl.exe"));
+    if is_wsl {
+        return None;
+    }
+    // `wslhost.exe`: WSL's helper under a `wsl` the user ran from another shell, which then goes by "wsl".
     let host = |name: &str| {
         let n = name.to_ascii_lowercase();
-        n == "conhost.exe" || n == "openconsole.exe"
+        n == "conhost.exe" || n == "openconsole.exe" || n == "wslhost.exe"
     };
     let mut best: Option<(usize, usize)> = None;
     let mut level: Vec<u32> = vec![shell];
@@ -685,6 +701,20 @@ mod tests {
         assert_eq!(foreground_among(&list[..2], 10), None);
         let list = vec![p(10, 1, "cmd.exe"), p(20, 10, "a.exe"), p(21, 10, "b.EXE")];
         assert_eq!(foreground_among(&list, 10).as_deref(), Some("b"));
+        // As WSL 3 starts a distro's shell, seen on a real PC.
+        let list = vec![p(10, 1, "wsl.exe"), p(11, 10, "conhost.exe"), p(20, 10, "wsl.exe"), p(30, 20, "wslhost.exe"), p(40, 30, "conhost.exe")];
+        assert_eq!(foreground_among(&list, 10), None, "a WSL terminal");
+        let mut from_pwsh = vec![p(5, 1, "pwsh.exe")];
+        from_pwsh.extend(list.iter().map(|(pid, parent, name)| (*pid, if *parent == 1 { 5 } else { *parent }, name.clone())));
+        assert_eq!(foreground_among(&from_pwsh, 5).as_deref(), Some("wsl"), "wsl run from PowerShell");
+    }
+
+    #[test]
+    fn a_distro_shell_is_named_after_the_distro() {
+        let wsl = Shell { program: "wsl.exe".into(), args: vec!["-d".into(), "Ubuntu-24.04".into(), "--cd".into(), "/home/me".into()], kind: ShellKind::Posix };
+        assert_eq!(wsl.name(), "Ubuntu-24.04");
+        let pwsh = Shell { program: r"C:\Program Files\PowerShell\7\pwsh.exe".into(), args: vec!["-NoLogo".into()], kind: ShellKind::PowerShell };
+        assert_eq!(pwsh.name(), "pwsh");
     }
 
     #[test]
