@@ -1227,7 +1227,12 @@ worktree /w/gone\nHEAD 4d15\ndetached\nprunable gitdir file points to non-existe
         std::fs::create_dir_all(&repository).unwrap();
         std::fs::create_dir_all(&plain).unwrap();
         cmd(&repository, ["init", "-q"]).run().unwrap();
-        let refused = refusal(&repository, &[("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")]).expect("refused");
+        // Without the machine's own settings: GitHub's Windows runners trust every folder (`safe.directory = *`).
+        let empty = dir.path().join("empty.gitconfig");
+        std::fs::write(&empty, "").unwrap();
+        let empty = empty.to_string_lossy().into_owned();
+        let isolated = [("GIT_CONFIG_NOSYSTEM", "1"), ("GIT_CONFIG_GLOBAL", empty.as_str()), ("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1")];
+        let refused = refusal(&repository, &isolated).expect("refused");
         assert!(refused.message.starts_with("detected dubious ownership"), "{refused:?}");
         assert!(refused.trust_command.unwrap().starts_with("git config --global --add safe.directory"));
         // A repository git takes, and a folder that is none, have nothing to explain.
