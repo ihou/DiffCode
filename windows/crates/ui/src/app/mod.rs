@@ -427,8 +427,12 @@ impl App {
         self.tick_updates();
         let mut next = self.viewer.tick();
         let visible = self.window_visible;
+        let selected = self.selected;
         for p in &mut self.projects {
-            if let Some(t) = p.tick(visible) {
+            // How often a repository that cannot be watched (inside WSL) is looked at: the one on screen often enough
+            // to follow an agent at work, the others for their counts in the list.
+            let poll_every = Duration::from_secs(if Some(p.id) == selected { 2 } else { 10 });
+            if let Some(t) = p.tick(visible, poll_every) {
                 next = Some(next.map_or(t, |n| n.min(t)));
             }
         }
@@ -1583,6 +1587,9 @@ impl Program for App {
             // Back from installing Git: no need to look for the button.
             if self.git_missing {
                 self.check_git_again();
+            }
+            for p in &mut self.projects {
+                p.poll_soon();
             }
         }
         if let Some(Event::FocusChanged(false)) = &ui.event {
