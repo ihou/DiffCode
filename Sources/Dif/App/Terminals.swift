@@ -148,6 +148,19 @@ final class DifTerminalView: TerminalView, @preconcurrency TerminalViewDelegate 
         return layer
     }
 
+    // Nor does it keep a layer of our own at the screen's pixel density: left at 1x, the text was drawn at half
+    // the resolution of a Retina screen and scaled up, soft at the edges.
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        matchBackingScale()
+    }
+
+    private func matchBackingScale() {
+        guard let layer, let scale = window?.backingScaleFactor, layer.contentsScale != scale else { return }
+        layer.contentsScale = scale
+        layer.setNeedsDisplay()
+    }
+
     // With a layer of our own, AppKit no longer turns view invalidation into layer invalidation; do it here.
     override func setNeedsDisplay(_ invalidRect: NSRect) {
         super.setNeedsDisplay(invalidRect)
@@ -193,6 +206,7 @@ final class DifTerminalView: TerminalView, @preconcurrency TerminalViewDelegate 
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        matchBackingScale()
         // SwiftTerm's own `scrollWheel` cannot be overridden from outside it, so the wheel is taken before it.
         if window != nil, wheelMonitor == nil {
             wheelMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
