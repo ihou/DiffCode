@@ -16,14 +16,14 @@ use crate::core::lang::l;
 use crate::core::lf;
 use crate::core::remote::RepoOperation;
 use crate::core::util::{date_time_text, relative_text};
-use crate::geom::{Color, Point, Rect, Size};
+use crate::geom::{Color, Rect, Size};
 use crate::icons::Icon;
 use crate::input::Key;
 use crate::paint::{Overflow, Weight};
 use crate::platform::Platform;
 use crate::text_field::FieldOutcome;
 use crate::ui::{Align, Id, Ui};
-use crate::widgets::{icon_button, splitter, Check};
+use crate::widgets::{icon_button, scroll_area, splitter, Check};
 
 pub fn project_panel(app: &mut App, vs: &mut ViewState, ui: &mut Ui, platform: &mut dyn Platform, rect: Rect) {
     let Some(id) = app.selected else { return };
@@ -1183,45 +1183,53 @@ pub fn ref_label(r: &str) -> String {
 }
 
 /// The selected commit's message and changed files.
-/// A wrapped message cut to four lines, ending in "…" when there was more.
-fn four_lines(ui: &mut Ui, message: &str, style: crate::paint::TextStyle) -> std::rc::Rc<dyn crate::paint::TextLayout> {
-    const LINES: usize = 4;
-    let full = ui.text_layout(message, style.clone());
-    let lines = full.line_count().max(1);
-    if lines <= LINES {
-        return full;
-    }
-    let line_h = full.size().h / lines as f32;
-    let width = style.max_width.unwrap_or(full.size().w);
-    let mut end = full.hit_test(Point::new(width, line_h * (LINES as f32 - 0.5))).min(message.len());
-    loop {
-        let text = format!("{}…", message[..end].trim_end());
-        let cut = ui.text_layout(&text, style.clone());
-        if cut.line_count() <= LINES || end == 0 {
-            return cut;
-        }
-        end = message[..end].char_indices().next_back().map_or(0, |(i, _)| i);
-    }
-}
-
 fn commit_detail(app: &mut App, vs: &mut ViewState, ui: &mut Ui, id: ProjectId, rect: Rect) {
     let t = ui.theme;
     let mut area = rect;
     let Some(p) = app.project(id) else { return };
+    let file_rows = p.commit_files.len();
     if let Some(commit) = p.selected_commit().cloned() {
         let message = if p.commit_body.is_empty() { commit.subject.clone() } else { p.commit_body.clone() };
         let mut style = crate::paint::TextStyle::new(t.font(12.0));
         let max_w = (area.w - t.s(28.0)).max(10.0);
         style.max_width = Some(max_w);
         style.overflow = Overflow::Wrap;
-        let layout = four_lines(ui, message.trim_end(), style);
+        let layout = ui.text_layout(message.trim_end(), style);
         let text_h = layout.size().h;
-        let h = t.s(8.0) + text_h + t.s(4.0) + t.s(16.0) + t.s(8.0);
-        let head = area.take_top(h);
-        ui.clipped(Rect::new(head.x, head.y, head.w, t.s(8.0) + text_h), |ui| {
-            ui.draw_layout(&layout, Rect::new(head.x + t.s(14.0), head.y + t.s(8.0), layout.size().w, layout.size().h), t.text, Align::Left);
+        // The whole message. A short one takes the room it needs. A long one gets what the files below leave (up to
+        // four of their rows stay in view), half the panel at least, and scrolls there, fading at the foot so that
+        // it shows there is more.
+        let fixed = t.s(8.0) + t.s(4.0) + t.s(16.0) + t.s(8.0) + 1.0;
+        let files = t.s(24.0) * file_rows.clamp(1, 4) as f32 + t.s(8.0);
+        let room = t.s(68.0).max(rect.h * 0.5).max(rect.h - fixed - files);
+        let scrolls = text_h > room + 0.5;
+        let fade = if scrolls { t.s(14.0) } else { 0.0 };
+        let view_h = text_h.min(room);
+        let head = area.take_top(t.s(8.0) + view_h + t.s(4.0) + t.s(16.0) + t.s(8.0));
+        let text_rect = Rect::new(head.x, head.y + t.s(8.0), head.w, view_h);
+        let scroll_id = Id::new("commit-message").with(id);
+        // Another commit's message starts at its top.
+        if vs.appeared(Id::new("commit-message-of").with((id, commit.hash.as_str()))) {
+            vs.scroll(scroll_id).offset = 0.0;
+        }
+        let scroll = vs.scroll(scroll_id);
+        // Scrolled to the end, the last line comes clear of the fade.
+        scroll_area(ui, scroll_id, text_rect, text_h + fade, scroll);
+        let offset = scroll.offset;
+        ui.clipped(text_rect, |ui| {
+            let r = Rect::new(head.x + t.s(14.0), text_rect.y - offset, layout.size().w, text_h);
+            ui.draw_layout(&layout, r, t.text, Align::Left);
+            if scrolls {
+                // Bands of the panel's colour, ever less clear, short of the scrollbar.
+                const BANDS: usize = 7;
+                let band = fade / BANDS as f32;
+                for k in 0..BANDS {
+                    let y = text_rect.bottom() - fade + band * k as f32;
+                    ui.fill(Rect::new(text_rect.x, y, text_rect.w - t.s(10.0), band + 0.5), t.panel.alpha((k + 1) as f32 / BANDS as f32));
+                }
+            }
         });
-        let info = Rect::new(head.x + t.s(14.0), head.y + t.s(8.0) + text_h + t.s(4.0), head.w - t.s(28.0), t.s(16.0));
+        let info = Rect::new(head.x + t.s(14.0), text_rect.bottom() + t.s(4.0), head.w - t.s(28.0), t.s(16.0));
         // The hash at the right copies the full hash.
         let hash = commit.short_hash();
         let hash_font = t.mono(10.5);

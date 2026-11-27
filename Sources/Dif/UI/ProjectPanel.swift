@@ -800,7 +800,7 @@ struct LogPanel: View {
                     CommitRowView(commit: commit)
                 }
                 HorizontalResizeHandle(height: $filesHeight, range: 120...520)
-                CommitDetail(project: project, focusToken: filesFocusToken)
+                CommitDetail(project: project, focusToken: filesFocusToken, height: filesHeight)
                     .frame(height: filesHeight)
             }
         }
@@ -897,6 +897,8 @@ struct RefChip: View {
 private struct CommitDetail: View {
     @Bindable var project: Project
     var focusToken: Int
+    /// The whole panel's height, which the message may take half of.
+    var height: CGFloat
     @Environment(AppStore.self) private var store
 
     var body: some View {
@@ -905,12 +907,8 @@ private struct CommitDetail: View {
         VStack(spacing: 0) {
             if let commit = project.selectedCommit {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(project.commitBody.isEmpty ? commit.subject : project.commitBody)
-                        .font(.ui(size: 12))
-                        .foregroundStyle(Color.difText)
-                        .lineLimit(4)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    message(project.commitBody.isEmpty ? commit.subject : project.commitBody, fileRows: rows.count)
+                        .id(commit.hash) // another commit's message starts at its top
                     HStack(spacing: 6) {
                         Text(commit.author)
                         Text(commit.date.formatted(date: .abbreviated, time: .shortened))
@@ -933,6 +931,8 @@ private struct CommitDetail: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
+                // Laid out before the files, which take what it leaves: else the two would share the panel evenly.
+                .layoutPriority(1)
                 Rectangle().fill(Color.difHairline).frame(height: 1)
             }
             KeyboardList(rows: rows,
@@ -969,6 +969,38 @@ private struct CommitDetail: View {
                 ChangeRowView(row: row, showDirectory: store.settings.flatList) { toggle(row) }
             }
         }
+    }
+
+    /// The whole message, subject and body. A short one takes the room it needs. A long one gets what the files
+    /// below leave (up to four of their rows stay in view), half the panel at least, and scrolls there, fading at
+    /// the foot so that it shows there is more.
+    private func message(_ text: String, fileRows: Int) -> some View {
+        let fade = UI.s(14)
+        let label = Text(text)
+            .font(.ui(size: 12))
+            .foregroundStyle(Color.difText)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        // The padding above and below, the author's line and the hairline under them; then the files' rows.
+        let files = UI.s(24) * CGFloat(min(max(fileRows, 1), 4)) + 8
+        let room = max(UI.s(68), height * 0.5, height - UI.s(37) - files)
+        return ViewThatFits(in: .vertical) {
+            label
+            ScrollView {
+                // Scrolled to the end, the last line comes clear of the fade.
+                label.padding(.bottom, fade)
+            }
+            .mask {
+                VStack(spacing: 0) {
+                    Color.black
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: fade)
+                }
+            }
+        }
+        // As tall as the message, up to the room: the scrolling one is picked only when the message is taller.
+        .frame(maxHeight: room)
+        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func toggle(_ row: ChangeRow) {
