@@ -223,6 +223,39 @@ enum DebugHooks {
                 FileHandle.standardError.write(Data("termwheel at=\(event.locationInWindow) precise=\(event.hasPreciseScrollingDeltas) dy=\(event.scrollingDeltaY)\n".utf8))
                 NSApp.postEvent(event, atStart: false)
             }
+        case "wheelat":
+            // "wheelat:x,y,<notches>" a mouse wheel at x,y in window points from the top-left, up positive;
+            // "wheelat:x,y,<points>,px" a trackpad's. Through the app's queue, like a real one.
+            let v = argument.split(separator: ",")
+            guard v.count >= 3, let window = store.window, let content = window.contentView,
+                  let x = Double(v[0]), let y = Double(v[1]), let amount = Double(v[2]),
+                  let cg = CGEvent(scrollWheelEvent2Source: nil, units: v.count > 3 ? .pixel : .line, wheelCount: 1,
+                                   wheel1: Int32(amount), wheel2: 0, wheel3: 0) else { break }
+            let base = content.convert(NSPoint(x: x, y: content.isFlipped ? y : content.bounds.height - y), to: nil)
+            if let field = CGEventField(rawValue: 51) { cg.setIntegerValueField(field, value: Int64(window.windowNumber)) }
+            CGEventSetWindowLocation(cg, CGPoint(x: base.x, y: window.frame.height - base.y))
+            if let event = NSEvent(cgEvent: cg) { NSApp.postEvent(event, atStart: false) }
+        case "scrollat":
+            // "scrollat:x,y" where the scroll view under x,y (window points from the top-left) stands, and how tall
+            // its content is.
+            let xy = argument.split(separator: ",").compactMap { Double($0) }
+            guard xy.count == 2, let content = store.window?.contentView else { break }
+            let point = NSPoint(x: xy[0], y: content.isFlipped ? xy[1] : content.bounds.height - xy[1])
+            func scrollViews(in view: NSView) -> [NSScrollView] {
+                view.subviews.flatMap { sub -> [NSScrollView] in (sub as? NSScrollView).map { [$0] } ?? [] + scrollViews(in: sub) }
+            }
+            // The innermost one there that is on screen.
+            guard let scroll = scrollViews(in: content).last(where: {
+                !$0.isHiddenOrHasHiddenAncestor && $0.convert($0.bounds, to: content).contains(point)
+            }) else {
+                FileHandle.standardError.write(Data("scrollat none\n".utf8))
+                break
+            }
+            let clip = scroll.contentView.bounds
+            FileHandle.standardError.write(Data(("scrollat y=\(clip.origin.y) visible=\(clip.height) " +
+                "content=\(scroll.documentView?.frame.height ?? -1) flipped=\(scroll.documentView?.isFlipped ?? false)\n").utf8))
+        case "hidewindow": store.window?.orderOut(nil)
+        case "showwindow": store.window?.makeKeyAndOrderFront(nil)
         case "termscreen":
             // The focused terminal's screen as the program drew it, and the modes that decide what the wheel does.
             if let session = store.terminals.sessions.first(where: { $0.id == store.terminals.focusedID }) ?? store.terminals.sessions.first {
