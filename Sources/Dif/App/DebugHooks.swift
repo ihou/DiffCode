@@ -194,6 +194,30 @@ enum DebugHooks {
             store.terminals.sessions.forEach { $0.pollForeground() }
             let lines = store.terminals.sessions.map { "\($0.processName)|\($0.title.suffix(30)) busy=\($0.isBusy) attention=\($0.needsAttention) started=\($0.isStarted) cols=\($0.view.getTerminal().cols) rows=\($0.view.getTerminal().rows)" }
             FileHandle.standardError.write(Data("terminals: visible=\(store.terminals.isVisible) focused=\(store.terminals.focusedID != nil) \(lines)\n".utf8))
+        case "termpixels":
+            // "termpixels[:/abs/out.png]": the focused terminal's layer scale and where each view up the chain lands
+            // on the screen's pixel grid; with a path, the layer's own pixels as Core Animation shows them.
+            guard let session = store.terminals.sessions.first(where: { $0.id == store.terminals.focusedID }) ?? store.terminals.sessions.first,
+                  let window = store.window else { break }
+            var out = "termpixels backing=\(window.backingScaleFactor) contentsScale=\(session.view.layer?.contentsScale ?? -1) font=\(session.view.font.fontName) \(session.view.font.pointSize)\n"
+            var view: NSView? = session.view
+            while let current = view {
+                let inWindow = current.convert(current.bounds, to: nil)
+                let px = window.convertToBacking(inWindow)
+                let layer = current.layer.map { "layer.frame=\($0.frame) scale=\($0.contentsScale)" } ?? "no layer"
+                out += "  \(type(of: current)) window=\(inWindow) px.origin=(\(px.origin.x), \(px.origin.y)) \(layer)\n"
+                view = current.superview
+            }
+            FileHandle.standardError.write(Data(out.utf8))
+            if !argument.isEmpty, let contents = session.view.layer?.contents {
+                if CFGetTypeID(contents as CFTypeRef) == CGImage.typeID {
+                    let image = contents as! CGImage // swiftlint:disable:this force_cast
+                    try? NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: argument))
+                    FileHandle.standardError.write(Data("termpixels image \(image.width)x\(image.height)\n".utf8))
+                } else {
+                    FileHandle.standardError.write(Data("termpixels contents \(type(of: contents)) \(String(describing: contents).prefix(120))\n".utf8))
+                }
+            }
         case "termline":
             // The focused terminal's cursor line, and whether an input method is composing there.
             if let session = store.terminals.sessions.first(where: { $0.id == store.terminals.focusedID }) ?? store.terminals.sessions.first {
