@@ -1088,7 +1088,13 @@ fn log_panel(app: &mut App, vs: &mut ViewState, ui: &mut Ui, platform: &mut dyn 
         }
     }
     if changed {
+        // Back to following the Log, then the commit's files and message (`picked_in_log` loads them only when a
+        // browsed file was on screen).
+        let browsing = app.project(id).is_some_and(|p| p.browsed_path.is_some());
         app.picked_in_log(id, true);
+        if !browsing {
+            app.commit_selection_changed(id);
+        }
     }
     if result.double_clicked.is_some() {
         app.focus_request = Some(ids::log_files());
@@ -1275,7 +1281,12 @@ fn commit_detail(app: &mut App, vs: &mut ViewState, ui: &mut Ui, id: ProjectId, 
         }
     }
     if changed {
+        // As above: the file's diff, which `picked_in_log` shows only when a browsed file was on screen.
+        let browsing = app.project(id).is_some_and(|p| p.browsed_path.is_some());
         app.picked_in_log(id, false);
+        if !browsing {
+            app.commit_file_selection_changed(id);
+        }
     }
     if let Some(i) = result.double_clicked {
         if rows[i].file().is_some() {
