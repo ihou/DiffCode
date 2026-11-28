@@ -648,7 +648,8 @@ pub fn fuzzy_label(
         bold.push(range);
     }
     let mut style = crate::paint::TextStyle::new(font);
-    style.max_width = Some(rect.w.max(1.0));
+    // A bold run is a little wider than the regular text the caller measured.
+    style.max_width = Some((rect.w + t.s(3.0)).max(1.0));
     style.overflow = overflow;
     let layout = ui.layout(crate::paint::TextRequest { text: std::sync::Arc::from(text), style, runs, bold_ranges: bold });
     ui.draw_layout(&layout, rect, base, Align::Left);

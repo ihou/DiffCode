@@ -6,13 +6,14 @@
 
 <p align="center">
   <b>An IDE-grade Git diff, without the IDE.</b><br>
-  A lightweight native app for Mac and Windows for reviewing what changed — yours, your teammates' or your coding agent's — and committing exactly what you mean.
+  A lightweight native app for Mac, Windows and Linux for reviewing what changed — yours, your teammates' or your coding agent's — and committing exactly what you mean.
 </p>
 
 <p align="center">
   <a href="LICENSE"><img alt="License: GPL v3" src="https://img.shields.io/badge/license-GPLv3-blue.svg"></a>
   <img alt="macOS 14 or later" src="https://img.shields.io/badge/macOS-14%2B-lightgrey.svg">
   <img alt="Windows 10 or later" src="https://img.shields.io/badge/Windows-10%2B-lightgrey.svg">
+  <img alt="Linux (GTK 3)" src="https://img.shields.io/badge/Linux-GTK%203-lightgrey.svg">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-AppKit-orange.svg">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-Win32-orange.svg">
 </p>
@@ -93,6 +94,17 @@ The installer is not code-signed — certificates cost money every year — so t
 
 The Windows version is a native Win32 app written in Rust, in [`windows/`](windows/PORTING.md). It has the same features; shortcuts follow the IDE's Windows keymap (`Ctrl` where the Mac uses `⌘`), and `Ctrl+/` lists them all. The built-in terminal runs PowerShell or cmd.
 
+### Linux
+
+There is no packaged Linux build yet. The GTK 3 version is built from source in [`windows/`](windows/PORTING.md). It needs Rust 1.85 or later, pkg-config, Git and the GTK 3 development headers (on Debian/Ubuntu, `sudo apt install build-essential pkg-config libgtk-3-dev libgdk-pixbuf-2.0-dev libpango1.0-dev libcairo2-dev`), then:
+
+```bash
+cd windows
+cargo build --release -p diffcode
+```
+
+A desktop on X11 or Wayland is needed to run it. Settings live in `~/.config/DiffCode` (or `$XDG_CONFIG_HOME/DiffCode` when that is set), the built-in terminal runs your login shell, and shortcuts use `Ctrl` where the Mac uses `⌘`.
+
 ### Build from source
 
 It takes a couple of minutes:
@@ -139,12 +151,12 @@ There is no index, no background process and no language server. Git does the he
 
 ## Not planned
 
-There is no Linux version. Editing is plain text in place — no code completion, multiple cursors or find-and-replace. Interactive rebase, tag management and submodules are left to `git` in the built-in terminal. DiffCode never opens an external editor.
+Editing is plain text in place — no code completion, multiple cursors or find-and-replace. Interactive rebase, tag management and submodules are left to `git` in the built-in terminal. DiffCode never opens an external editor.
 
 ## Documentation
 
 - [User guide (简体中文)](docs/GUIDE.zh-CN.md) — every feature in detail, plus measurements and the code layout.
-- [Windows port](windows/PORTING.md) — how the Windows version is built, tested and released.
+- [Windows and Linux ports](windows/PORTING.md) — how those versions are built, tested and released.
 - Building the release editions: [`release/macos`](release/macos/README.md) (notarized download with Sparkle) and [`release/appstore`](release/appstore/README.md) (sandboxed Mac App Store edition, not published).
 
 ## Contributing

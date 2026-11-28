@@ -9,6 +9,8 @@ mod gallery;
 mod mac;
 #[cfg(windows)]
 mod win;
+#[cfg(target_os = "linux")]
+mod linux;
 
 #[cfg(target_os = "macos")]
 fn main() {
@@ -360,5 +362,29 @@ fn main() {
     win::run(Box::new(app));
 }
 
-#[cfg(not(any(windows, target_os = "macos")))]
+#[cfg(target_os = "linux")]
+fn main() {
+    use diffcode_ui::app::settings::Settings;
+    use diffcode_ui::app::App;
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--version") {
+        println!("DiffCode {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
+    if args.iter().any(|a| a == "--gallery") {
+        linux::run(Box::new(gallery::GalleryProgram::default()));
+        return;
+    }
+    let dir = linux::config_dir();
+    let _ = std::fs::create_dir_all(&dir);
+    let settings = Settings::load(&dir.join("settings.ini"));
+    let system_chinese = linux::system_chinese();
+    diffcode_ui::core::lang::set_chinese(settings.language.is_chinese(system_chinese));
+    let mut app = App::new(settings);
+    app.system_chinese = system_chinese;
+    linux::run(Box::new(app));
+}
+
+#[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 fn main() {}

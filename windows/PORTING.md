@@ -9,7 +9,8 @@ How the Windows version is built, how it maps onto the Mac app, and where each f
   text layout handles, events, widgets) and every view and the app state (ported from `Sources/Dif/App` and `UI`).
 - `crates/app` (`diffcode`, binary `DiffCode.exe`): raw Win32 window + Direct2D/DirectWrite painter on Windows; on macOS
   a headless CoreGraphics/CoreText painter that renders scripted frames to PNG, so views can be checked without a
-  Windows machine. The macOS backend never ships.
+  Windows machine. The macOS backend never ships. On Linux a GTK 3 window and a Pango/Cairo painter
+  (`crates/app/src/linux`) implement the same `Platform`, `Program` and `Painter` traits.
 - Localisation: `lang::l("English", "中文")` and `lf!` (format args), like the Mac `L(_:_:)`.
 - Toolchain on the Mac: rustup at `/opt/homebrew/opt/rustup/bin` (stable, target `x86_64-pc-windows-gnu`),
   mingw-w64 linker (`.cargo/config.toml`). `export PATH=/opt/homebrew/opt/rustup/bin:$PATH`.
@@ -93,6 +94,58 @@ shell's descendants.
 Every feature is checked in the Mac harness first, then on Windows with a build from CI.
 
 Checks: `cargo test --workspace`, `cargo clippy --workspace`, `cargo clippy -p diffcode --target x86_64-pc-windows-gnu`.
+
+## Linux
+
+The Linux backend lives in `crates/app/src/linux` and is built only for `cfg(target_os = "linux")`; the Windows and
+macOS backends are untouched. The one shared change is a 3 DIP width allowance for bold fuzzy matches, which keeps
+short file names such as `notes.txt` from being ellipsized in Go to File. It needs GTK 3, Pango, Cairo and
+gdk-pixbuf development headers. On Debian/Ubuntu:
+
+```sh
+sudo apt install build-essential pkg-config libgtk-3-dev libgdk-pixbuf-2.0-dev libpango1.0-dev libcairo2-dev
+cd windows
+cargo build --release -p diffcode
+./target/release/DiffCode
+```
+
+`cargo test --workspace` runs the same platform-neutral tests as on Windows. Settings live in
+`$XDG_CONFIG_HOME/DiffCode/settings.ini` (`~/.config/DiffCode/settings.ini` by default). The window, settings,
+file picker, clipboard, terminal and keyboard use the desktop's GTK theme and fonts; the code and terminal fonts
+are picked in Settings. `--version` and `--gallery` are available on Linux too.
+
+To install for one user, copy the binary and icon and add a desktop entry:
+
+```sh
+install -Dm755 target/release/DiffCode ~/.local/bin/DiffCode
+install -Dm644 crates/app/res/DiffCode.png ~/.local/share/icons/hicolor/256x256/apps/DiffCode.png
+cat > ~/.local/share/applications/DiffCode.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=DiffCode
+Comment=Read and edit changes in a Git repository
+Exec=/home/USER/.local/bin/DiffCode
+Icon=/home/USER/.local/share/icons/hicolor/256x256/apps/DiffCode.png
+Terminal=false
+Categories=Development;RevisionControl;
+StartupWMClass=DiffCode
+EOF
+```
+
+Replace `USER` with your account name; an absolute icon path avoids depending on the desktop's icon cache.
+
+Known differences from Windows:
+
+- Window placement is restored on X11; Wayland does not let an application place its own windows.
+- There is no single-instance hand-off: launching DiffCode again opens another window. The language restart still
+  spawns a new process and closes the old one.
+- Files deleted from the working tree go to a per-run scratch folder (`$TMPDIR/diffcode-<pid>/recycle`), not the
+  desktop Trash; undo restores them until DiffCode exits. A normal quit removes the folder; a crash or `SIGKILL`
+  can leave it behind.
+- Dragging files into the window works; dragging files out does not.
+- "Show in folder" opens the containing folder instead of selecting the file, as none of the common Linux file
+  managers offers a portable selection API.
+- The update check is disabled (the settings toggle is kept so a shared settings file still loads).
 
 ## Releases
 
