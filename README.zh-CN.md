@@ -6,7 +6,7 @@
 
 <p align="center">
   <b>像 IDE 一样好用的 Git diff，不用打开 IDE。</b><br>
-  一个轻量的原生应用（Mac 和 Windows）：看清改了什么——你自己的、同事的，或者 coding agent 的——只提交你想提交的。
+  一个轻量的原生应用（Mac、Windows 和 Linux）：看清改了什么——你自己的、同事的，或者 coding agent 的——只提交你想提交的。
 </p>
 
 <p align="center">
@@ -93,6 +93,17 @@ dif ~/work/app ~/work/lib
 
 Windows 版是用 Rust 写的原生 Win32 应用，代码在 [`windows/`](windows/PORTING.md)。功能和 Mac 版一致；快捷键沿用 IDE 的 Windows 键位（Mac 上的 `⌘` 换成 `Ctrl`），按 `Ctrl+/` 查看全部。内置终端运行 PowerShell 或 cmd。
 
+### Linux
+
+目前还没有 Linux 安装包。GTK 3 版需要从源码构建，完整步骤见 [`windows/PORTING.md`](windows/PORTING.md)。需要 Rust 1.85 及以上、pkg-config、Git 和 GTK 3 开发头文件（Debian/Ubuntu 上：`sudo apt install build-essential pkg-config libgtk-3-dev libgdk-pixbuf-2.0-dev libpango1.0-dev libcairo2-dev`），然后：
+
+```bash
+cd windows
+cargo build --release -p diffcode
+```
+
+运行需要 X11 或 Wayland 桌面；配置在 `~/.config/DiffCode`（设置了 `$XDG_CONFIG_HOME` 时则在 `$XDG_CONFIG_HOME/DiffCode`），内置终端运行你的登录 shell。快捷键里 Mac 的 `⌘` 换成 `Ctrl`。
+
 ### 从源码构建
 
 大约几分钟：
@@ -119,7 +130,7 @@ Scripts/build-app.sh --install   # 构建 DiffCode.app，复制到 /Applications
 ## 文档
 
 - [使用说明](docs/GUIDE.zh-CN.md)：每个功能的细节、全部快捷键、实测数据和代码结构。
-- [Windows 移植](windows/PORTING.md)：Windows 版怎么构建、测试和发布。
+- [Windows / Linux 移植](windows/PORTING.md)：这两个版本怎么构建、测试和发布。
 - 发布渠道的构建：[`release/macos`](release/macos/README.md)（公证版，Sparkle 自动更新）和 [`release/appstore`](release/appstore/README.md)（沙盒化的 App Store 版，未上架）。
 
 ## 参与

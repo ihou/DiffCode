@@ -52,3 +52,11 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",
 ] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+gdk-pixbuf = "0.18"
+pangocairo = "0.18"
+cairo-rs = { version = "0.18", features = ["png"] }
+async-channel = "2"
+libc = "0.2"
